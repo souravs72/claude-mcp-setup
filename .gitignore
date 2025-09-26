@@ -1,0 +1,25 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+mcp-env/
+
+# Logs and PIDs
+logs/*.log
+pids/*.pid
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+claude-desktop-debian/
+claude-desktop-debian/*
