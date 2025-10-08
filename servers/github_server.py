@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-import asyncio
 import json
-import sys
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict
 from github import Github, Auth
 from mcp.server.fastmcp import FastMCP
 
@@ -35,7 +32,7 @@ else:
     logger.error("GitHub token not provided. Set GITHUB_PERSONAL_ACCESS_TOKEN environment variable.")
 
 @mcp.tool("list_repositories")
-def list_repositories(username: str = None) -> str:
+def list_repositories(username: str | None = None) -> str:
     """List repositories for a user or authenticated user"""
     try:
         if not github_client:
@@ -102,7 +99,7 @@ def list_issues(repo_name: str, state: str = "open") -> str:
             issue_list.append({
                 "number": issue.number,
                 "title": issue.title,
-                "body": issue.body[:500] + "..." if len(issue.body or "") > 500 else issue.body,  # Truncate long bodies
+                "body": issue.body[:500] + "..." if len(issue.body or "") > 500 else issue.body,
                 "state": issue.state,
                 "url": issue.html_url,
                 "user": issue.user.login,

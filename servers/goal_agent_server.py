@@ -23,13 +23,13 @@ mcp = FastMCP("Goal-Based AI Agent Server")
 
 class GoalAgent:
     def __init__(self):
-        self.goals = {}
-        self.tasks = {}
+        self.goals: dict[str, dict] = {}
+        self.tasks: dict[str, dict] = {}
         self.goal_counter = 0
         self.task_counter = 0
         
     def create_goal(self, description: str, priority: str = "medium", 
-                   repos: list[str] = None, metadata: dict = None) -> dict:
+                   repos: list[str] | None = None, metadata: dict | None = None) -> dict:
         """Create a new goal"""
         self.goal_counter += 1
         goal_id = f"GOAL-{self.goal_counter}"
@@ -98,8 +98,8 @@ class GoalAgent:
         ]
         return goal
     
-    def list_goals(self, status: str = None, priority: str = None) -> list[dict]:
-        """list all goals with optional filters"""
+    def list_goals(self, status: str | None = None, priority: str | None = None) -> list[dict]:
+        """List all goals with optional filters"""
         goals = list(self.goals.values())
         
         if status:
@@ -134,7 +134,7 @@ class GoalAgent:
         
         return task
     
-    def get_next_tasks(self, goal_id: str = None) -> list[dict]:
+    def get_next_tasks(self, goal_id: str | None = None) -> list[dict]:
         """Get next executable tasks (no pending dependencies)"""
         tasks_to_check = []
         
@@ -224,7 +224,7 @@ agent = GoalAgent()
 
 @mcp.tool("create_goal")
 def create_goal(description: str, priority: str = "medium", 
-                repos: str = None, metadata: str = None) -> str:
+                repos: str | None = None, metadata: str | None = None) -> str:
     """
     Create a new goal for the AI agent to work on.
     
@@ -251,17 +251,7 @@ def break_down_goal(goal_id: str, subtasks: str) -> str:
     
     Args:
         goal_id: The ID of the goal to break down
-        subtasks: JSON array of subtask objects with structure:
-                  [{
-                    "description": "Task description",
-                    "type": "code|documentation|testing|review",
-                    "priority": "high|medium|low",
-                    "repo": "repo-name",
-                    "dependencies": ["TASK-1", "TASK-2"],
-                    "tools": ["github", "jira", "frappe"],
-                    "estimated_effort": "1h|2h|1d",
-                    "jira_ticket": "PROJ-123"
-                  }]
+        subtasks: JSON array of subtask objects
     """
     try:
         subtasks_list = json.loads(subtasks)
@@ -282,14 +272,8 @@ def get_goal(goal_id: str) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool("list_goals")
-def list_goals(status: str = None, priority: str = None) -> str:
-    """
-    list all goals with optional filters.
-    
-    Args:
-        status: Filter by status (planned, in_progress, completed)
-        priority: Filter by priority (high, medium, low)
-    """
+def list_goals(status: str | None = None, priority: str | None = None) -> str:
+    """List all goals with optional filters"""
     try:
         goals = agent.list_goals(status, priority)
         return json.dumps(goals, indent=2)
@@ -298,13 +282,8 @@ def list_goals(status: str = None, priority: str = None) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool("get_next_tasks")
-def get_next_tasks(goal_id: str = None) -> str:
-    """
-    Get next executable tasks (tasks with no pending dependencies).
-    
-    Args:
-        goal_id: Optional goal ID to filter tasks by goal
-    """
+def get_next_tasks(goal_id: str | None = None) -> str:
+    """Get next executable tasks (tasks with no pending dependencies)"""
     try:
         tasks = agent.get_next_tasks(goal_id)
         return json.dumps(tasks, indent=2)
@@ -313,15 +292,8 @@ def get_next_tasks(goal_id: str = None) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool("update_task_status")
-def update_task_status(task_id: str, status: str, result: str = None) -> str:
-    """
-    Update the status of a task.
-    
-    Args:
-        task_id: The task ID to update
-        status: New status (pending, in_progress, completed, failed, blocked)
-        result: JSON object with task execution result
-    """
+def update_task_status(task_id: str, status: str, result: str | None = None) -> str:
+    """Update the status of a task"""
     try:
         result_dict = json.loads(result) if result else None
         task = agent.update_task_status(task_id, status, result_dict)
@@ -342,10 +314,7 @@ def get_task(task_id: str) -> str:
 
 @mcp.tool("generate_execution_plan")
 def generate_execution_plan(goal_id: str) -> str:
-    """
-    Generate a phased execution plan for a goal based on task dependencies.
-    Shows which tasks can be executed in parallel and which must wait.
-    """
+    """Generate a phased execution plan for a goal based on task dependencies"""
     try:
         plan = agent.generate_execution_plan(goal_id)
         return json.dumps(plan, indent=2)

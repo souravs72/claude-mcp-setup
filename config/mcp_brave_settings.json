@@ -2,7 +2,7 @@
   "mcpServers": {
     "internet-server": {
       "command": "python",
-      "args": ["/path/to/your/project/servers/internets_server.py"],
+      "args": ["/path/to/your/project/servers/internet_server.py"],
       "env": {
         "GOOGLE_API_KEY": "your_google_api_key",
         "GOOGLE_SEARCH_ENGINE_ID": "your_search_engine_id"

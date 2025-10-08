@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import subprocess
 import sys
-import os
 import time
 from pathlib import Path
 
@@ -16,7 +15,7 @@ logs_dir.mkdir(exist_ok=True)
 servers = [
     {
         "name": "internet_server",
-        "script": servers_dir / "internets_server.py",
+        "script": servers_dir / "internet_server.py",
         "log_file": logs_dir / "internet_server.log"
     },
     {

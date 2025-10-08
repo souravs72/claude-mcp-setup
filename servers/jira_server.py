@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-import asyncio
 import json
-import sys
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 import requests
 from requests.auth import HTTPBasicAuth
 from mcp.server.fastmcp import FastMCP
@@ -46,14 +43,14 @@ class JiraClient:
         }
         logger.info("Jira client initialized successfully")
     
-    def get_issue(self, issue_key: str) -> Dict:
+    def get_issue(self, issue_key: str) -> dict:
         """Get a specific Jira issue"""
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}"
         response = requests.get(url, headers=self.headers, auth=self.auth)
         response.raise_for_status()
         return response.json()
     
-    def search_issues(self, jql: str, max_results: int = 50, fields: List[str] = None) -> Dict:
+    def search_issues(self, jql: str, max_results: int = 50, fields: list[str] | None = None) -> dict:
         """Search for issues using JQL"""
         url = f"{self.base_url}/rest/api/3/search"
         
@@ -70,9 +67,9 @@ class JiraClient:
         return response.json()
     
     def create_issue(self, project_key: str, summary: str, description: str,
-                    issue_type: str = "Task", priority: str = None, 
-                    assignee: str = None, labels: List[str] = None,
-                    custom_fields: Dict = None) -> Dict:
+                    issue_type: str = "Task", priority: str | None = None, 
+                    assignee: str | None = None, labels: list[str] | None = None,
+                    custom_fields: dict | None = None) -> dict:
         """Create a new Jira issue"""
         url = f"{self.base_url}/rest/api/3/issue"
         
@@ -115,18 +112,16 @@ class JiraClient:
         response.raise_for_status()
         return response.json()
     
-    def update_issue(self, issue_key: str, fields: Dict) -> bool:
+    def update_issue(self, issue_key: str, fields: dict) -> bool:
         """Update an existing Jira issue"""
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}"
-        
         payload = {'fields': fields}
-        
         response = requests.put(url, headers=self.headers, auth=self.auth, json=payload)
         response.raise_for_status()
         return True
     
     def transition_issue(self, issue_key: str, transition_id: str, 
-                        comment: str = None) -> bool:
+                        comment: str | None = None) -> bool:
         """Transition an issue to a different status"""
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}/transitions"
         
@@ -163,14 +158,14 @@ class JiraClient:
         response.raise_for_status()
         return True
     
-    def get_transitions(self, issue_key: str) -> List[Dict]:
+    def get_transitions(self, issue_key: str) -> list[dict]:
         """Get available transitions for an issue"""
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}/transitions"
         response = requests.get(url, headers=self.headers, auth=self.auth)
         response.raise_for_status()
         return response.json().get('transitions', [])
     
-    def add_comment(self, issue_key: str, comment: str) -> Dict:
+    def add_comment(self, issue_key: str, comment: str) -> dict:
         """Add a comment to an issue"""
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}/comment"
         
@@ -211,7 +206,7 @@ class JiraClient:
         response.raise_for_status()
         return True
     
-    def get_projects(self) -> List[Dict]:
+    def get_projects(self) -> list[dict]:
         """Get all accessible projects"""
         url = f"{self.base_url}/rest/api/3/project"
         response = requests.get(url, headers=self.headers, auth=self.auth)
@@ -231,15 +226,8 @@ def jira_get_issue(issue_key: str) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool("jira_search_issues")
-def jira_search_issues(jql: str, max_results: int = 50, fields: str = None) -> str:
-    """
-    Search for Jira issues using JQL (Jira Query Language).
-    
-    Example JQL queries:
-    - "project = PROJ AND status = 'In Progress'"
-    - "assignee = currentUser() AND status != Done"
-    - "created >= -7d ORDER BY created DESC"
-    """
+def jira_search_issues(jql: str, max_results: int = 50, fields: str | None = None) -> str:
+    """Search for Jira issues using JQL (Jira Query Language)"""
     try:
         fields_list = json.loads(fields) if fields else None
         results = jira_client.search_issues(jql, max_results, fields_list)
@@ -250,22 +238,10 @@ def jira_search_issues(jql: str, max_results: int = 50, fields: str = None) -> s
 
 @mcp.tool("jira_create_issue")
 def jira_create_issue(project_key: str, summary: str, description: str,
-                     issue_type: str = "Task", priority: str = None,
-                     assignee: str = None, labels: str = None,
-                     custom_fields: str = None) -> str:
-    """
-    Create a new Jira issue.
-    
-    Args:
-        project_key: The project key (e.g., "PROJ")
-        summary: Issue summary/title
-        description: Detailed description
-        issue_type: Type of issue (Task, Bug, Story, Epic, etc.)
-        priority: Priority level (Highest, High, Medium, Low, Lowest)
-        assignee: Assignee account ID
-        labels: JSON array of label strings
-        custom_fields: JSON object with custom field values
-    """
+                     issue_type: str = "Task", priority: str | None = None,
+                     assignee: str | None = None, labels: str | None = None,
+                     custom_fields: str | None = None) -> str:
+    """Create a new Jira issue"""
     try:
         labels_list = json.loads(labels) if labels else None
         custom_dict = json.loads(custom_fields) if custom_fields else None
@@ -281,13 +257,7 @@ def jira_create_issue(project_key: str, summary: str, description: str,
 
 @mcp.tool("jira_update_issue")
 def jira_update_issue(issue_key: str, fields: str) -> str:
-    """
-    Update an existing Jira issue.
-    
-    Args:
-        issue_key: The issue key (e.g., "PROJ-123")
-        fields: JSON object with fields to update
-    """
+    """Update an existing Jira issue"""
     try:
         fields_dict = json.loads(fields)
         result = jira_client.update_issue(issue_key, fields_dict)
@@ -298,11 +268,8 @@ def jira_update_issue(issue_key: str, fields: str) -> str:
 
 @mcp.tool("jira_transition_issue")
 def jira_transition_issue(issue_key: str, transition_id: str, 
-                         comment: str = None) -> str:
-    """
-    Transition a Jira issue to a different status.
-    Use jira_get_transitions first to see available transitions.
-    """
+                         comment: str | None = None) -> str:
+    """Transition a Jira issue to a different status"""
     try:
         result = jira_client.transition_issue(issue_key, transition_id, comment)
         return json.dumps({"success": result})
@@ -333,11 +300,7 @@ def jira_add_comment(issue_key: str, comment: str) -> str:
 @mcp.tool("jira_link_issues")
 def jira_link_issues(inward_issue: str, outward_issue: str, 
                     link_type: str = "Relates") -> str:
-    """
-    Create a link between two Jira issues.
-    
-    Common link types: Relates, Blocks, Clones, Duplicates
-    """
+    """Create a link between two Jira issues"""
     try:
         result = jira_client.link_issues(inward_issue, outward_issue, link_type)
         return json.dumps({"success": result})

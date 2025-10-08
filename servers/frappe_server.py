@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-import asyncio
 import json
-import sys
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict
 import requests
 from mcp.server.fastmcp import FastMCP
 
@@ -44,12 +41,15 @@ class FrappeClient:
         })
         logger.info("Frappe client initialized successfully")
 
-    def get_doc(self, doctype: str, name: str):
+    def get_doc(self, doctype: str, name: str) -> dict:
+        """Get a specific document"""
         response = self.session.get(f"{self.base_url}/api/resource/{doctype}/{name}")
         response.raise_for_status()
         return response.json()
 
-    def get_list(self, doctype: str, filters=None, fields=None, limit=20):
+    def get_list(self, doctype: str, filters: dict | None = None, 
+                 fields: list[str] | None = None, limit: int = 20) -> dict:
+        """Get list of documents with optional filters"""
         params = {'limit_page_length': limit}
         if filters:
             params['filters'] = json.dumps(filters)
@@ -60,7 +60,8 @@ class FrappeClient:
         response.raise_for_status()
         return response.json()
 
-    def create_doc(self, doctype: str, data: dict):
+    def create_doc(self, doctype: str, data: dict) -> dict:
+        """Create a new document"""
         response = self.session.post(f"{self.base_url}/api/resource/{doctype}", json=data)
         response.raise_for_status()
         return response.json()
@@ -78,7 +79,8 @@ def frappe_get_document(doctype: str, name: str) -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool("frappe_get_list")
-def frappe_get_list(doctype: str, filters: str = None, fields: str = None, limit: int = 20) -> str:
+def frappe_get_list(doctype: str, filters: str | None = None, 
+                   fields: str | None = None, limit: int = 20) -> str:
     """Get a list of documents from Frappe with optional filters"""
     try:
         filter_dict = json.loads(filters) if filters else None

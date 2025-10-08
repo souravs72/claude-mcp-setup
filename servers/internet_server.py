@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
-import asyncio
 import json
-import sys
 import logging
-from typing import Any, Dict
+import os
+from pathlib import Path
 import requests
 from mcp.server.fastmcp import FastMCP
 
-# Configure logging
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    project_root = Path(__file__).parent.parent
+    env_path = project_root / '.env'
+    load_dotenv(env_path)
+    print(f"Loaded environment from: {env_path}")
+except ImportError:
+    print("python-dotenv not installed. Using system environment variables.")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -15,25 +23,56 @@ mcp = FastMCP("Internet Access Server")
 
 @mcp.tool("web_search")
 def web_search(query: str, max_results: int = 10) -> str:
-    """Search the web using Brave Search API"""
+    """Search the web using Google Custom Search API"""
     try:
-        api_key = os.environ.get('BRAVE_API_KEY')
-        if not api_key:
-            return json.dumps({"error": "BRAVE_API_KEY not configured"})
+        api_key = os.environ.get('GOOGLE_API_KEY')
+        search_engine_id = os.environ.get('GOOGLE_SEARCH_ENGINE_ID')
         
-        headers = {"X-Subscription-Token": api_key}
-        params = {"q": query, "count": max_results}
+        if not api_key or not search_engine_id:
+            return json.dumps({
+                "error": "Google API credentials not configured",
+                "missing": {
+                    "api_key": not api_key,
+                    "search_engine_id": not search_engine_id
+                }
+            })
         
-        response = requests.get(
-            "https://api.search.brave.com/res/v1/web/search",
-            headers=headers,
-            params=params
-        )
+        base_url = "https://www.googleapis.com/customsearch/v1"
+        
+        params = {
+            'key': api_key,
+            'cx': search_engine_id,
+            'q': query,
+            'num': min(max_results, 10)
+        }
+        
+        response = requests.get(base_url, params=params, timeout=10)
         
         if response.status_code == 200:
-            return json.dumps(response.json())
+            data = response.json()
+            
+            formatted_results = {
+                'query': query,
+                'total_results': data.get('searchInformation', {}).get('totalResults', 0),
+                'search_time': data.get('searchInformation', {}).get('searchTime', 0),
+                'items': []
+            }
+            
+            for item in data.get('items', []):
+                formatted_results['items'].append({
+                    'title': item.get('title', ''),
+                    'link': item.get('link', ''),
+                    'snippet': item.get('snippet', ''),
+                    'displayLink': item.get('displayLink', '')
+                })
+            
+            return json.dumps(formatted_results)
         else:
-            return json.dumps({"error": f"Search failed: {response.status_code}"})
+            error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
+            return json.dumps({
+                "error": f"Google Search API error: {response.status_code}",
+                "details": error_data
+            })
             
     except Exception as e:
         logger.error(f"Web search error: {str(e)}")
@@ -43,17 +82,32 @@ def web_search(query: str, max_results: int = 10) -> str:
 def web_fetch(url: str) -> str:
     """Fetch content from a specific URL"""
     try:
-        response = requests.get(url, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, timeout=15, headers=headers)
+        
         return json.dumps({
             "url": url,
             "status_code": response.status_code,
-            "content": response.text[:5000]  # Limit content size
+            "content_type": response.headers.get('content-type', 'unknown'),
+            "content": response.text[:8000],
+            "content_length": len(response.text)
         })
     except Exception as e:
         logger.error(f"Web fetch error: {str(e)}")
-        return json.dumps({"error": str(e)})
+        return json.dumps({"error": str(e), "url": url})
 
 if __name__ == "__main__":
-    import os
-    logger.info("Starting Internet Access Server")
+    logger.info("Starting Internet Access Server with Google Custom Search")
+    
+    # Check if credentials are available
+    api_key = os.environ.get('GOOGLE_API_KEY')
+    search_engine_id = os.environ.get('GOOGLE_SEARCH_ENGINE_ID')
+    
+    if api_key and search_engine_id:
+        logger.info("Google API credentials loaded successfully")
+    else:
+        logger.warning("Google API credentials missing - check your .env file")
+    
     mcp.run()

@@ -332,7 +332,7 @@ claude-mcp-setup/
 │   ├── jira_server.py
 │   ├── github_server.py
 │   ├── frappe_server.py
-│   └── internets_server.py
+│   └── internet_server.py
 ├── requirements/         # Dependency specifications
 ├── scripts/             # Management utilities
 │   ├── start_all_servers.py
