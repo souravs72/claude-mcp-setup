@@ -27,7 +27,38 @@ A complete Model Context Protocol (MCP) server implementation that extends Claud
    mkdir claude-mcp-setup
    cd claude-mcp-setup
    ```
+   
+2. **Architecure:**
 
+```
+┌────────────────────────────────────────────────────────┐
+│                    Claude Desktop                       │
+│              (Conversational Interface)                 │
+└───────────────────────┬────────────────────────────────┘
+                        │
+                        │ MCP Protocol
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+┌───────▼──────┐ ┌─────▼────┐  ┌──────▼─────┐
+│ Goal Agent   │ │   Jira   │  │   GitHub   │
+│   Server     │ │  Server  │  │   Server   │
+│              │ │          │  │            │
+│ • Goals      │ │ • Issues │  │ • Repos    │
+│ • Tasks      │ │ • Search │  │ • Issues   │
+│ • Planning   │ │ • Create │  │ • Files    │
+│ • Tracking   │ │ • Update │  │            │
+└───────┬──────┘ └─────┬────┘  └──────┬─────┘
+        │               │               │
+        └───────────────┴───────────────┘
+                        │
+            ┌───────────┼───────────┐
+            │           │           │
+      ┌─────▼────┐ ┌───▼──────┐ ┌──▼────────┐
+      │  Frappe  │ │ Internet │ │   Your    │
+      │  Server  │ │  Server  │ │  Systems  │
+      └──────────┘ └──────────┘ └───────────┘
+```
 2. **Create the folder structure:**
    ```
    claude-mcp-setup/
