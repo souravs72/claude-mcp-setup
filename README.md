@@ -440,7 +440,6 @@ print('Token:', 'Set' if os.getenv('JIRA_API_TOKEN') else 'Missing')
 
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get running in 5 minutes
 - **[Goal Agent Documentation](docs/README_GOAL_AGENT.md)** - Complete API reference
-- **[Architecture Overview](docs/FILE_STRUCTURE.md)** - System design details
 - **[Contributing Guide](CONTRIBUTING.md)** - Development guidelines
 
 ---
