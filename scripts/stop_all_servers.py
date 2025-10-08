@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-import subprocess
-import sys
-import os
 import time
-import signal
 import psutil
 from pathlib import Path
 
 # Get the project root directory
 project_root = Path(__file__).parent.parent
 
-def find_server_processes():
+def find_server_processes() -> list[dict]:
     """Find all running MCP server processes"""
     server_processes = []
     
@@ -36,7 +32,7 @@ def find_server_processes():
     
     return server_processes
 
-def stop_servers():
+def stop_servers() -> None:
     """Stop all MCP server processes"""
     print("Searching for running MCP server processes...")
     
@@ -92,7 +88,7 @@ def stop_servers():
     
     print("\nServer shutdown complete.")
 
-def stop_servers_by_pid_file():
+def stop_servers_by_pid_file() -> bool:
     """Alternative method using PID files if they exist"""
     pid_dir = project_root / "pids"
     if not pid_dir.exists():

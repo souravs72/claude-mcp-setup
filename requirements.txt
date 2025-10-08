@@ -1,0 +1,14 @@
+# Core MCP and API dependencies
+mcp>=1.0.0
+pydantic>=2.6.0,<2.10.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# GitHub integration
+PyGithub>=2.1.0
+
+# Process management for scripts
+psutil>=5.9.0
+
+# Optional: For better logging
+colorlog>=6.7.0
