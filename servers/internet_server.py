@@ -1,113 +1,265 @@
 #!/usr/bin/env python3
+"""
+Internet/Search MCP Server - Production Ready
+Provides web search and fetch capabilities via Google Custom Search API
+"""
 import json
-import logging
-import os
+import sys
 from pathlib import Path
+from typing import Optional
 import requests
+
 from mcp.server.fastmcp import FastMCP
 
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    project_root = Path(__file__).parent.parent
-    env_path = project_root / '.env'
-    load_dotenv(env_path)
-    print(f"Loaded environment from: {env_path}")
-except ImportError:
-    print("python-dotenv not installed. Using system environment variables.")
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
+from servers.config import load_env_file, InternetConfig, validate_config, ConfigurationError
+from servers.base_client import BaseClient, handle_errors
 
-mcp = FastMCP("Internet Access Server")
+# Initialize
+project_root = Path(__file__).parent.parent
+log_file = project_root / "logs" / "internet_server.log"
+logger = setup_logging("InternetServer", log_file=log_file)
 
-@mcp.tool("web_search")
-def web_search(query: str, max_results: int = 10) -> str:
-    """Search the web using Google Custom Search API"""
-    try:
-        api_key = os.environ.get('GOOGLE_API_KEY')
-        search_engine_id = os.environ.get('GOOGLE_SEARCH_ENGINE_ID')
+load_env_file()
+mcp = FastMCP("Internet Search & Fetch Server")
+
+
+class InternetClient(BaseClient):
+    """Internet client for web search and page fetching."""
+    
+    def __init__(self, config: InternetConfig):
+        super().__init__(
+            base_url="https://www.googleapis.com",
+            timeout=config.timeout,
+            max_retries=config.max_retries,
+            logger=logger
+        )
         
-        if not api_key or not search_engine_id:
-            return json.dumps({
-                "error": "Google API credentials not configured",
-                "missing": {
-                    "api_key": not api_key,
-                    "search_engine_id": not search_engine_id
-                }
-            })
+        self.config = config
+        self.search_endpoint = "/customsearch/v1"
         
-        base_url = "https://www.googleapis.com/customsearch/v1"
+        logger.info("Internet client initialized successfully")
+    
+    def search(
+        self,
+        query: str,
+        max_results: int = 10,
+        search_type: Optional[str] = None,
+        file_type: Optional[str] = None,
+        date_restrict: Optional[str] = None
+    ) -> dict:
+        """
+        Search the web using Google Custom Search API.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results (1-10)
+            search_type: Type of search (image, etc.)
+            file_type: Filter by file type (pdf, doc, etc.)
+            date_restrict: Date restriction (d[number], w[number], m[number], y[number])
+            
+        Returns:
+            Search results
+        """
+        logger.debug(f"Searching: {query} (max: {max_results})")
         
         params = {
-            'key': api_key,
-            'cx': search_engine_id,
+            'key': self.config.google_api_key,
+            'cx': self.config.search_engine_id,
             'q': query,
             'num': min(max_results, 10)
         }
         
-        response = requests.get(base_url, params=params, timeout=10)
+        if search_type:
+            params['searchType'] = search_type
         
-        if response.status_code == 200:
-            data = response.json()
+        if file_type:
+            params['fileType'] = file_type
+        
+        if date_restrict:
+            params['dateRestrict'] = date_restrict
+        
+        response = self.get(self.search_endpoint, params=params)
+        data = response.json()
+        
+        # Format results
+        formatted = {
+            'query': query,
+            'total_results': data.get('searchInformation', {}).get('totalResults', '0'),
+            'search_time': data.get('searchInformation', {}).get('searchTime', 0),
+            'items': []
+        }
+        
+        for item in data.get('items', []):
+            formatted['items'].append({
+                'title': item.get('title', ''),
+                'link': item.get('link', ''),
+                'snippet': item.get('snippet', ''),
+                'displayLink': item.get('displayLink', ''),
+                'formattedUrl': item.get('formattedUrl', ''),
+                'mime': item.get('mime', ''),
+                'fileFormat': item.get('fileFormat', '')
+            })
+        
+        logger.info(f"Search returned {len(formatted['items'])} results")
+        return formatted
+    
+    def fetch_url(self, url: str, timeout: Optional[int] = None) -> dict:
+        """
+        Fetch content from a specific URL.
+        
+        Args:
+            url: URL to fetch
+            timeout: Request timeout (overrides default)
             
-            formatted_results = {
-                'query': query,
-                'total_results': data.get('searchInformation', {}).get('totalResults', 0),
-                'search_time': data.get('searchInformation', {}).get('searchTime', 0),
-                'items': []
+        Returns:
+            Page content and metadata
+        """
+        logger.debug(f"Fetching URL: {url}")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        }
+        
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=timeout or self.timeout,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+            
+            # Limit content size to prevent memory issues
+            content = response.text
+            content_length = len(content)
+            max_content = 50000  # 50KB of text
+            
+            if content_length > max_content:
+                content = content[:max_content]
+                truncated = True
+            else:
+                truncated = False
+            
+            result = {
+                'url': url,
+                'final_url': response.url,
+                'status_code': response.status_code,
+                'content_type': response.headers.get('content-type', 'unknown'),
+                'content': content,
+                'content_length': content_length,
+                'truncated': truncated,
+                'encoding': response.encoding
             }
             
-            for item in data.get('items', []):
-                formatted_results['items'].append({
-                    'title': item.get('title', ''),
-                    'link': item.get('link', ''),
-                    'snippet': item.get('snippet', ''),
-                    'displayLink': item.get('displayLink', '')
-                })
+            logger.info(f"Fetched {content_length} bytes from {url}")
+            return result
             
-            return json.dumps(formatted_results)
-        else:
-            error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
-            return json.dumps({
-                "error": f"Google Search API error: {response.status_code}",
-                "details": error_data
-            })
-            
-    except Exception as e:
-        logger.error(f"Web search error: {str(e)}")
-        return json.dumps({"error": str(e)})
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch {url}: {e}")
+            raise
 
-@mcp.tool("web_fetch")
-def web_fetch(url: str) -> str:
-    """Fetch content from a specific URL"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, timeout=15, headers=headers)
+
+# Initialize client
+try:
+    config = InternetConfig()
+    validate_config(config, logger)
+    
+    log_server_startup(logger, "Internet Server", {
+        "Timeout": config.timeout,
+        "Max Retries": config.max_retries
+    })
+    
+    internet_client = InternetClient(config)
+    
+except ConfigurationError as e:
+    logger.critical(f"Configuration error: {e}")
+    internet_client = None
+except Exception as e:
+    logger.critical(f"Failed to initialize Internet client: {e}", exc_info=True)
+    internet_client = None
+
+
+# MCP Tools
+@mcp.tool()
+@handle_errors(logger)
+def web_search(
+    query: str,
+    max_results: int = 10,
+    search_type: Optional[str] = None,
+    file_type: Optional[str] = None,
+    date_restrict: Optional[str] = None
+) -> str:
+    """
+    Search the web using Google Custom Search API.
+    
+    Args:
+        query: Search query
+        max_results: Maximum number of results (1-10, default: 10)
+        search_type: Type of search (image, etc.)
+        file_type: Filter by file type (pdf, doc, etc.)
+        date_restrict: Date restriction (d[number], w[number], m[number], y[number])
         
-        return json.dumps({
-            "url": url,
-            "status_code": response.status_code,
-            "content_type": response.headers.get('content-type', 'unknown'),
-            "content": response.text[:8000],
-            "content_length": len(response.text)
-        })
-    except Exception as e:
-        logger.error(f"Web fetch error: {str(e)}")
-        return json.dumps({"error": str(e), "url": url})
+    Returns:
+        JSON string with search results
+        
+    Examples:
+        web_search("python programming")
+        web_search("machine learning", max_results=5)
+        web_search("research paper", file_type="pdf")
+        web_search("recent news", date_restrict="w1")
+    """
+    if not internet_client:
+        return json.dumps({"error": "Internet client not initialized"})
+    
+    results = internet_client.search(query, max_results, search_type, file_type, date_restrict)
+    return json.dumps(results, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def web_fetch(url: str, timeout: Optional[int] = None) -> str:
+    """
+    Fetch content from a specific URL.
+    
+    Args:
+        url: URL to fetch
+        timeout: Request timeout in seconds (optional)
+        
+    Returns:
+        JSON string with page content and metadata
+        
+    Examples:
+        web_fetch("https://example.com")
+        web_fetch("https://example.com/article", timeout=20)
+    """
+    if not internet_client:
+        return json.dumps({"error": "Internet client not initialized"})
+    
+    result = internet_client.fetch_url(url, timeout)
+    return json.dumps(result, indent=2)
+
 
 if __name__ == "__main__":
-    logger.info("Starting Internet Access Server with Google Custom Search")
-    
-    # Check if credentials are available
-    api_key = os.environ.get('GOOGLE_API_KEY')
-    search_engine_id = os.environ.get('GOOGLE_SEARCH_ENGINE_ID')
-    
-    if api_key and search_engine_id:
-        logger.info("Google API credentials loaded successfully")
-    else:
-        logger.warning("Google API credentials missing - check your .env file")
-    
-    mcp.run()
+    try:
+        if not internet_client:
+            logger.error("Server starting with errors - some features unavailable")
+        
+        logger.info("Starting Internet MCP Server...")
+        mcp.run()
+        
+    except KeyboardInterrupt:
+        log_server_shutdown(logger, "Internet Server")
+    except Exception as e:
+        logger.critical(f"Fatal error: {e}", exc_info=True)
+        raise
+    finally:
+        if internet_client:
+            internet_client.close()
