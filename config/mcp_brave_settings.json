@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "internet-server": {
+      "command": "python",
+      "args": ["/path/to/your/project/servers/internets_server.py"],
+      "env": {
+        "GOOGLE_API_KEY": "your_google_api_key",
+        "GOOGLE_SEARCH_ENGINE_ID": "your_search_engine_id"
+      }
+    },
+    "github-server": {
+      "command": "python", 
+      "args": ["/path/to/your/project/servers/github_server.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token"
+      }
+    },
+    "frappe-server": {
+      "command": "python",
+      "args": ["/path/to/your/project/servers/frappe_server.py"],
+      "env": {
+        "FRAPPE_SITE_URL": "http://127.0.0.1:8005",
+        "FRAPPE_API_KEY": "your_frappe_key", 
+        "FRAPPE_API_SECRET": "your_frappe_secret"
+      }
+    },
+    "jira-server": {
+      "command": "python",
+      "args": ["/path/to/your/project/servers/jira_server.py"],
+      "env": {
+        "JIRA_BASE_URL": "https://your-domain.atlassian.net",
+        "JIRA_EMAIL": "your_email@example.com",
+        "JIRA_API_TOKEN": "your_jira_token",
+        "JIRA_PROJECT_KEY": "PROJ"
+      }
+    },
+    "goal-agent-server": {
+      "command": "python",
+      "args": ["/path/to/your/project/servers/goal_agent_server.py"]
+    }
+  }
+}

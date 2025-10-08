@@ -28,6 +28,16 @@ servers = [
         "name": "frappe_server",
         "script": servers_dir / "frappe_server.py", 
         "log_file": logs_dir / "frappe_server.log"
+    },
+    {
+        "name": "jira_server",
+        "script": servers_dir / "jira_server.py",
+        "log_file": logs_dir / "jira_server.log"
+    },
+    {
+        "name": "goal_agent_server",
+        "script": servers_dir / "goal_agent_server.py",
+        "log_file": logs_dir / "goal_agent_server.log"
     }
 ]
 
@@ -54,8 +64,14 @@ def start_servers():
         # Give each server a moment to start
         time.sleep(2)
     
-    print("All servers started. Check log files for status.")
+    print("\nAll servers started. Check log files for status:")
+    for proc in processes:
+        print(f"  - {proc['name']}: {proc['log_file']}")
+    
     return processes
 
 if __name__ == "__main__":
+    print("=" * 50)
+    print("Starting MCP Server Infrastructure")
+    print("=" * 50)
     start_servers()
