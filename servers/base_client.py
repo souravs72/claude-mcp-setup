@@ -64,6 +64,37 @@ class BaseClient:
         
         return session
     
+    def _parse_error_response(self, response: requests.Response) -> str:
+        """
+        Parse error response. Can be overridden by subclasses for custom error parsing.
+        
+        Args:
+            response: Response object with error
+            
+        Returns:
+            Error message string
+        """
+        # Check if subclass has a custom parser
+        if hasattr(self, '_parse_jira_error'):
+            return self._parse_jira_error(response)
+        
+        # Default error parsing
+        try:
+            error_data = response.json()
+            
+            # Try common error formats
+            if 'error' in error_data:
+                if isinstance(error_data['error'], dict):
+                    return error_data['error'].get('message', str(error_data['error']))
+                return str(error_data['error'])
+            
+            if 'message' in error_data:
+                return error_data['message']
+            
+            return response.text[:500]
+        except:
+            return response.text[:500]
+    
     def _make_request(
         self,
         method: str,
@@ -92,6 +123,8 @@ class BaseClient:
         
         self.logger.debug(f"{method} {url}")
         
+        response = None
+        
         try:
             response = self.session.request(method, url, **kwargs)
             response.raise_for_status()
@@ -106,8 +139,19 @@ class BaseClient:
             self.logger.error(f"Connection error: {url}")
             raise
         except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTP error {response.status_code}: {url}")
-            raise
+            if response is not None:
+                error_msg = self._parse_error_response(response)
+                self.logger.error(f"HTTP error {response.status_code}: {error_msg}")
+                
+                # Create a new exception with the parsed error message
+                enhanced_error = requests.exceptions.HTTPError(
+                    f"{response.status_code} - {error_msg}",
+                    response=response
+                )
+                raise enhanced_error from e
+            else:
+                self.logger.error(f"HTTP error: {url}")
+                raise
         except Exception as e:
             self.logger.error(f"Unexpected error: {str(e)}")
             raise

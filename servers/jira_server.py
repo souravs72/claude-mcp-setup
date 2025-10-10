@@ -5,8 +5,10 @@ Provides integration with Jira via REST API
 """
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Optional, List, Dict
+from datetime import datetime
 from requests.auth import HTTPBasicAuth
 
 from mcp.server.fastmcp import FastMCP
@@ -40,6 +42,8 @@ class JiraClient(BaseClient):
         
         self.config = config
         self.auth = HTTPBasicAuth(config.email, config.api_token)
+        self.last_request_time = None
+        self.rate_limit_delay = config.rate_limit_delay
         
         # Set headers
         self.session.headers.update({
@@ -61,23 +65,143 @@ class JiraClient(BaseClient):
             logger.error(f"Connection verification failed: {e}")
             raise
     
-    def _format_description(self, description: str) -> Dict:
-        """Format description for Atlassian Document Format."""
-        return {
-            'type': 'doc',
-            'version': 1,
-            'content': [
-                {
-                    'type': 'paragraph',
-                    'content': [
-                        {
-                            'type': 'text',
-                            'text': description
-                        }
-                    ]
-                }
-            ]
-        }
+    def _rate_limit(self):
+        """Implement basic rate limiting."""
+        if self.last_request_time:
+            elapsed = (datetime.now() - self.last_request_time).total_seconds()
+            if elapsed < self.rate_limit_delay:
+                time.sleep(self.rate_limit_delay - elapsed)
+        
+        self.last_request_time = datetime.now()
+    
+    def _make_jira_request(self, method: str, endpoint: str, **kwargs):
+        """Make request with rate limiting."""
+        self._rate_limit()
+        
+        # Add auth if not present
+        if 'auth' not in kwargs:
+            kwargs['auth'] = self.auth
+        
+        return self._make_request(method, endpoint, **kwargs)
+    
+    def _parse_jira_error(self, response) -> str:
+        """Parse Jira error response for meaningful messages."""
+        try:
+            error_data = response.json()
+            
+            # Jira returns errors in various formats
+            if 'errorMessages' in error_data and error_data['errorMessages']:
+                return ' | '.join(error_data['errorMessages'])
+            
+            if 'errors' in error_data and error_data['errors']:
+                errors = [f"{field}: {msg}" for field, msg in error_data['errors'].items()]
+                return ' | '.join(errors)
+            
+            return error_data.get('message', response.text[:500])
+        except Exception:
+            return response.text[:500]
+    
+    def _format_description(self, description: str, rich_text: bool = False) -> Dict:
+        """
+        Format description for Atlassian Document Format.
+        
+        Args:
+            description: Description text
+            rich_text: If True, preserve line breaks and formatting
+            
+        Returns:
+            Formatted ADF object
+        """
+        if not description:
+            return {
+                'type': 'doc',
+                'version': 1,
+                'content': []
+            }
+        
+        if rich_text:
+            # Split by paragraphs and preserve structure
+            paragraphs = description.split('\n\n')
+            content = []
+            
+            for para in paragraphs:
+                if para.strip():
+                    content.append({
+                        'type': 'paragraph',
+                        'content': [
+                            {
+                                'type': 'text',
+                                'text': para.strip()
+                            }
+                        ]
+                    })
+            
+            return {
+                'type': 'doc',
+                'version': 1,
+                'content': content if content else [
+                    {
+                        'type': 'paragraph',
+                        'content': [{'type': 'text', 'text': description}]
+                    }
+                ]
+            }
+        else:
+            # Simple single paragraph
+            return {
+                'type': 'doc',
+                'version': 1,
+                'content': [
+                    {
+                        'type': 'paragraph',
+                        'content': [
+                            {
+                                'type': 'text',
+                                'text': description
+                            }
+                        ]
+                    }
+                ]
+            }
+    
+    def build_jql(
+        self,
+        project: Optional[str] = None,
+        status: Optional[str] = None,
+        assignee: Optional[str] = None,
+        issue_type: Optional[str] = None,
+        **kwargs
+    ) -> str:
+        """
+        Build JQL query from common parameters.
+        
+        Args:
+            project: Project key
+            status: Status name
+            assignee: Assignee username or 'currentUser()'
+            issue_type: Issue type name
+            **kwargs: Additional JQL conditions
+            
+        Returns:
+            JQL query string
+        """
+        conditions = []
+        
+        if project:
+            conditions.append(f'project = "{project}"')
+        if status:
+            conditions.append(f'status = "{status}"')
+        if assignee:
+            conditions.append(f'assignee = {assignee}')
+        if issue_type:
+            conditions.append(f'issuetype = "{issue_type}"')
+        
+        for key, value in kwargs.items():
+            conditions.append(f'{key} = "{value}"')
+        
+        jql = ' AND '.join(conditions) if conditions else 'order by created DESC'
+        logger.debug(f"Built JQL: {jql}")
+        return jql
     
     def get_issue(self, issue_key: str, fields: Optional[List[str]] = None) -> Dict:
         """
@@ -96,7 +220,7 @@ class JiraClient(BaseClient):
         if fields:
             params['fields'] = ','.join(fields)
         
-        response = self.get(f"/rest/api/3/issue/{issue_key}", params=params, auth=self.auth)
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}", params=params)
         data = response.json()
         
         logger.info(f"Retrieved issue: {issue_key}")
@@ -132,13 +256,58 @@ class JiraClient(BaseClient):
         if fields:
             payload['fields'] = fields
         
-        response = self.post("/rest/api/3/search", json=payload, auth=self.auth)
+        response = self._make_jira_request("POST", "/rest/api/3/search", json=payload)
         data = response.json()
         
         count = len(data.get('issues', []))
         total = data.get('total', 0)
         logger.info(f"Search returned {count} of {total} issues")
         
+        return data
+    
+    def get_project_issue_types(self, project_key: str) -> List[Dict]:
+        """
+        Get available issue types for a project.
+        
+        Args:
+            project_key: Project key
+            
+        Returns:
+            List of available issue types
+        """
+        logger.debug(f"Fetching issue types for project: {project_key}")
+        
+        response = self._make_jira_request(
+            "GET",
+            f"/rest/api/3/issue/createmeta/{project_key}/issuetypes"
+        )
+        data = response.json()
+        
+        issue_types = data.get('issueTypes', [])
+        logger.info(f"Found {len(issue_types)} issue types for {project_key}")
+        
+        return issue_types
+    
+    def get_create_metadata(self, project_key: str, issue_type_id: str) -> Dict:
+        """
+        Get field metadata for creating issues.
+        
+        Args:
+            project_key: Project key
+            issue_type_id: Issue type ID
+            
+        Returns:
+            Field metadata including required fields
+        """
+        logger.debug(f"Fetching create metadata: {project_key}/{issue_type_id}")
+        
+        response = self._make_jira_request(
+            "GET",
+            f"/rest/api/3/issue/createmeta/{project_key}/issuetypes/{issue_type_id}"
+        )
+        data = response.json()
+        
+        logger.info(f"Retrieved metadata for {project_key}/{issue_type_id}")
         return data
     
     def create_issue(
@@ -150,7 +319,8 @@ class JiraClient(BaseClient):
         priority: Optional[str] = None,
         assignee: Optional[str] = None,
         labels: Optional[List[str]] = None,
-        custom_fields: Optional[Dict] = None
+        custom_fields: Optional[Dict] = None,
+        rich_text: bool = False
     ) -> Dict:
         """
         Create a new Jira issue.
@@ -164,6 +334,7 @@ class JiraClient(BaseClient):
             assignee: Assignee account ID
             labels: List of labels
             custom_fields: Custom field values
+            rich_text: Preserve formatting in description
             
         Returns:
             Created issue data
@@ -173,7 +344,7 @@ class JiraClient(BaseClient):
         fields = {
             'project': {'key': project_key},
             'summary': summary,
-            'description': self._format_description(description),
+            'description': self._format_description(description, rich_text),
             'issuetype': {'name': issue_type}
         }
         
@@ -191,13 +362,80 @@ class JiraClient(BaseClient):
         
         payload = {'fields': fields}
         
-        response = self.post("/rest/api/3/issue", json=payload, auth=self.auth)
-        data = response.json()
+        logger.debug(f"Issue creation payload: {json.dumps(payload, indent=2)}")
         
-        issue_key = data.get('key', 'Unknown')
-        logger.info(f"Created issue: {issue_key}")
+        try:
+            response = self._make_jira_request("POST", "/rest/api/3/issue", json=payload)
+            data = response.json()
+            
+            logger.debug(f"Create response: {json.dumps(data, indent=2)}")
+            
+            # Validate response
+            if 'key' not in data:
+                error_msg = data.get('errorMessages', ['Unknown error'])
+                logger.error(f"Issue creation failed: {error_msg}")
+                raise ValueError(f"Issue creation failed: {error_msg}")
+            
+            issue_key = data.get('key')
+            logger.info(f"Created issue: {issue_key}")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}")
+            logger.error(f"Error: {str(e)}")
+            raise
+    
+    def create_issues_bulk(self, issues: List[Dict]) -> Dict:
+        """
+        Create multiple issues in a single API call.
         
-        return data
+        Args:
+            issues: List of issue definitions with keys:
+                   - project_key, summary, description, issue_type, priority (optional)
+            
+        Returns:
+            Results of bulk creation
+        """
+        logger.debug(f"Creating {len(issues)} issues in bulk")
+        
+        # Format issues for bulk creation
+        issue_updates = []
+        for issue in issues:
+            fields = {
+                'project': {'key': issue['project_key']},
+                'summary': issue['summary'],
+                'description': self._format_description(issue.get('description', '')),
+                'issuetype': {'name': issue.get('issue_type', 'Task')}
+            }
+            
+            if issue.get('priority'):
+                fields['priority'] = {'name': issue['priority']}
+            
+            if issue.get('labels'):
+                fields['labels'] = issue['labels']
+            
+            issue_updates.append({'fields': fields})
+        
+        payload = {'issueUpdates': issue_updates}
+        
+        try:
+            response = self._make_jira_request("POST", "/rest/api/3/issue/bulk", json=payload)
+            data = response.json()
+            
+            successful = len(data.get('issues', []))
+            errors = data.get('errors', [])
+            
+            logger.info(f"Bulk created: {successful} successful, {len(errors)} failed")
+            
+            if errors:
+                logger.warning(f"Bulk creation errors: {errors}")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Bulk creation failed: {str(e)}")
+            raise
     
     def update_issue(self, issue_key: str, fields: Dict) -> bool:
         """
@@ -211,12 +449,18 @@ class JiraClient(BaseClient):
             Success status
         """
         logger.debug(f"Updating issue: {issue_key}")
+        logger.debug(f"Update fields: {json.dumps(fields, indent=2)}")
         
         payload = {'fields': fields}
-        response = self.put(f"/rest/api/3/issue/{issue_key}", json=payload, auth=self.auth)
         
-        logger.info(f"Updated issue: {issue_key}")
-        return True
+        try:
+            self._make_jira_request("PUT", f"/rest/api/3/issue/{issue_key}", json=payload)
+            logger.info(f"Updated issue: {issue_key}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to update issue {issue_key}: {str(e)}")
+            raise
     
     def delete_issue(self, issue_key: str) -> bool:
         """
@@ -230,7 +474,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Deleting issue: {issue_key}")
         
-        response = self.delete(f"/rest/api/3/issue/{issue_key}", auth=self.auth)
+        self._make_jira_request("DELETE", f"/rest/api/3/issue/{issue_key}")
         
         logger.info(f"Deleted issue: {issue_key}")
         return True
@@ -264,7 +508,9 @@ class JiraClient(BaseClient):
             payload['update'] = {
                 'comment': [
                     {
-                        'add': self._format_description(comment)
+                        'add': {
+                            'body': self._format_description(comment)
+                        }
                     }
                 ]
             }
@@ -272,10 +518,12 @@ class JiraClient(BaseClient):
         if fields:
             payload['fields'] = fields
         
-        response = self.post(
+        logger.debug(f"Transition payload: {json.dumps(payload, indent=2)}")
+        
+        self._make_jira_request(
+            "POST",
             f"/rest/api/3/issue/{issue_key}/transitions",
-            json=payload,
-            auth=self.auth
+            json=payload
         )
         
         logger.info(f"Transitioned issue: {issue_key}")
@@ -293,7 +541,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching transitions for: {issue_key}")
         
-        response = self.get(f"/rest/api/3/issue/{issue_key}/transitions", auth=self.auth)
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/transitions")
         data = response.json()
         
         transitions = data.get('transitions', [])
@@ -301,13 +549,14 @@ class JiraClient(BaseClient):
         
         return transitions
     
-    def add_comment(self, issue_key: str, comment: str) -> Dict:
+    def add_comment(self, issue_key: str, comment: str, rich_text: bool = False) -> Dict:
         """
         Add a comment to an issue.
         
         Args:
             issue_key: Issue key
             comment: Comment text
+            rich_text: Preserve formatting
             
         Returns:
             Created comment data
@@ -315,13 +564,13 @@ class JiraClient(BaseClient):
         logger.debug(f"Adding comment to: {issue_key}")
         
         payload = {
-            'body': self._format_description(comment)
+            'body': self._format_description(comment, rich_text)
         }
         
-        response = self.post(
+        response = self._make_jira_request(
+            "POST",
             f"/rest/api/3/issue/{issue_key}/comment",
-            json=payload,
-            auth=self.auth
+            json=payload
         )
         data = response.json()
         
@@ -340,7 +589,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching comments for: {issue_key}")
         
-        response = self.get(f"/rest/api/3/issue/{issue_key}/comment", auth=self.auth)
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/comment")
         data = response.json()
         
         comments = data.get('comments', [])
@@ -373,7 +622,7 @@ class JiraClient(BaseClient):
             'outwardIssue': {'key': outward_issue}
         }
         
-        response = self.post("/rest/api/3/issueLink", json=payload, auth=self.auth)
+        self._make_jira_request("POST", "/rest/api/3/issueLink", json=payload)
         
         logger.info(f"Linked issues: {inward_issue} <-> {outward_issue}")
         return True
@@ -387,7 +636,7 @@ class JiraClient(BaseClient):
         """
         logger.debug("Fetching projects")
         
-        response = self.get("/rest/api/3/project", auth=self.auth)
+        response = self._make_jira_request("GET", "/rest/api/3/project")
         projects = response.json()
         
         logger.info(f"Retrieved {len(projects)} projects")
@@ -410,10 +659,10 @@ class JiraClient(BaseClient):
             'accountId': account_id
         }
         
-        response = self.put(
+        self._make_jira_request(
+            "PUT",
             f"/rest/api/3/issue/{issue_key}/assignee",
-            json=payload,
-            auth=self.auth
+            json=payload
         )
         
         logger.info(f"Assigned issue {issue_key}")
@@ -431,7 +680,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching watchers for: {issue_key}")
         
-        response = self.get(f"/rest/api/3/issue/{issue_key}/watchers", auth=self.auth)
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/watchers")
         data = response.json()
         
         logger.info(f"Retrieved watchers for {issue_key}")
@@ -450,10 +699,11 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Adding watcher to {issue_key}")
         
-        response = self.post(
+        # Note: POST body for add watcher is just the accountId as a string in quotes
+        self._make_jira_request(
+            "POST",
             f"/rest/api/3/issue/{issue_key}/watchers",
-            json=account_id,
-            auth=self.auth
+            json=account_id
         )
         
         logger.info(f"Added watcher to {issue_key}")
@@ -470,7 +720,8 @@ try:
         "Email": config.email,
         "Project Key": config.project_key or "Not set",
         "Timeout": config.timeout,
-        "Max Retries": config.max_retries
+        "Max Retries": config.max_retries,
+        "Rate Limit Delay": config.rate_limit_delay
     })
     
     jira_client = JiraClient(config)
@@ -535,6 +786,72 @@ def jira_search_issues(
 
 @mcp.tool()
 @handle_errors(logger)
+def jira_build_jql(
+    project: Optional[str] = None,
+    status: Optional[str] = None,
+    assignee: Optional[str] = None,
+    issue_type: Optional[str] = None
+) -> str:
+    """
+    Build a JQL query from common parameters.
+    
+    Args:
+        project: Project key
+        status: Status name (e.g., "Open", "In Progress", "Done")
+        assignee: Assignee (use "currentUser()" for current user)
+        issue_type: Issue type name (e.g., "Bug", "Task", "Story")
+        
+    Returns:
+        JSON string with built JQL query
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    jql = jira_client.build_jql(project, status, assignee, issue_type)
+    return json.dumps({"jql": jql}, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_get_project_issue_types(project_key: str) -> str:
+    """
+    Get available issue types for a Jira project.
+    
+    Args:
+        project_key: Project key (e.g., "CGV2")
+        
+    Returns:
+        JSON string with available issue types and their IDs
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    issue_types = jira_client.get_project_issue_types(project_key)
+    return json.dumps(issue_types, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_get_create_metadata(project_key: str, issue_type_id: str) -> str:
+    """
+    Get field metadata for creating issues in a project.
+    
+    Args:
+        project_key: Project key
+        issue_type_id: Issue type ID (get from jira_get_project_issue_types)
+        
+    Returns:
+        JSON string with field metadata including required fields
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    metadata = jira_client.get_create_metadata(project_key, issue_type_id)
+    return json.dumps(metadata, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
 def jira_create_issue(
     project_key: str,
     summary: str,
@@ -543,23 +860,25 @@ def jira_create_issue(
     priority: Optional[str] = None,
     assignee: Optional[str] = None,
     labels: Optional[str] = None,
-    custom_fields: Optional[str] = None
+    custom_fields: Optional[str] = None,
+    rich_text: bool = False
 ) -> str:
     """
     Create a new Jira issue.
     
     Args:
-        project_key: Project key
-        summary: Issue summary
+        project_key: Project key (e.g., "CGV2")
+        summary: Issue summary/title
         description: Issue description
-        issue_type: Issue type (Task, Bug, Story, etc.)
-        priority: Priority name
+        issue_type: Issue type (Task, Bug, Story, Epic, etc.)
+        priority: Priority name (High, Medium, Low, etc.)
         assignee: Assignee account ID
         labels: JSON array of labels
         custom_fields: JSON object with custom field values
+        rich_text: Preserve paragraph formatting in description
         
     Returns:
-        JSON string with created issue
+        JSON string with created issue including issue key
     """
     if not jira_client:
         return json.dumps({"error": "Jira client not initialized"})
@@ -569,9 +888,31 @@ def jira_create_issue(
     
     issue = jira_client.create_issue(
         project_key, summary, description, issue_type,
-        priority, assignee, labels_list, custom_dict
+        priority, assignee, labels_list, custom_dict, rich_text
     )
     return json.dumps(issue, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_create_issues_bulk(issues: str) -> str:
+    """
+    Create multiple Jira issues in a single API call.
+    
+    Args:
+        issues: JSON array of issue objects, each with:
+               - project_key, summary, description (required)
+               - issue_type, priority, labels (optional)
+        
+    Returns:
+        JSON string with bulk creation results
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    issues_list = json.loads(issues)
+    result = jira_client.create_issues_bulk(issues_list)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -581,7 +922,7 @@ def jira_update_issue(issue_key: str, fields: str) -> str:
     Update an existing Jira issue.
     
     Args:
-        issue_key: Issue key
+        issue_key: Issue key (e.g., "CGV2-123")
         fields: JSON object with fields to update
         
     Returns:
@@ -602,7 +943,7 @@ def jira_delete_issue(issue_key: str) -> str:
     Delete a Jira issue.
     
     Args:
-        issue_key: Issue key
+        issue_key: Issue key (e.g., "CGV2-123")
         
     Returns:
         JSON string with success status
@@ -627,8 +968,8 @@ def jira_transition_issue(
     
     Args:
         issue_key: Issue key
-        transition_id: Transition ID
-        comment: Optional comment
+        transition_id: Transition ID (get from jira_get_transitions)
+        comment: Optional comment to add during transition
         fields: JSON object with optional field updates
         
     Returns:
@@ -652,7 +993,7 @@ def jira_get_transitions(issue_key: str) -> str:
         issue_key: Issue key
         
     Returns:
-        JSON string with available transitions
+        JSON string with available transitions and their IDs
     """
     if not jira_client:
         return json.dumps({"error": "Jira client not initialized"})
@@ -663,13 +1004,14 @@ def jira_get_transitions(issue_key: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def jira_add_comment(issue_key: str, comment: str) -> str:
+def jira_add_comment(issue_key: str, comment: str, rich_text: bool = False) -> str:
     """
     Add a comment to a Jira issue.
     
     Args:
         issue_key: Issue key
         comment: Comment text
+        rich_text: Preserve paragraph formatting
         
     Returns:
         JSON string with created comment
@@ -677,7 +1019,7 @@ def jira_add_comment(issue_key: str, comment: str) -> str:
     if not jira_client:
         return json.dumps({"error": "Jira client not initialized"})
     
-    result = jira_client.add_comment(issue_key, comment)
+    result = jira_client.add_comment(issue_key, comment, rich_text)
     return json.dumps(result, indent=2)
 
 
@@ -713,7 +1055,7 @@ def jira_link_issues(
     Args:
         inward_issue: Inward issue key
         outward_issue: Outward issue key
-        link_type: Link type name (Relates, Blocks, Clones, Duplicates)
+        link_type: Link type (Relates, Blocks, Clones, Duplicates)
         
     Returns:
         JSON string with success status

@@ -90,6 +90,7 @@ class JiraConfig(BaseConfig):
     project_key: str = field(default_factory=lambda: os.getenv('JIRA_PROJECT_KEY', ''))
     timeout: int = field(default_factory=lambda: int(os.getenv('JIRA_TIMEOUT', '30')))
     max_retries: int = field(default_factory=lambda: int(os.getenv('JIRA_MAX_RETRIES', '3')))
+    rate_limit_delay: float = field(default_factory=lambda: float(os.getenv('JIRA_RATE_LIMIT_DELAY', '0.5')))
     
     def __post_init__(self):
         self.base_url = self.base_url.rstrip('/')
