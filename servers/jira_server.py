@@ -44,6 +44,7 @@ class JiraClient(BaseClient):
         self.auth = HTTPBasicAuth(config.email, config.api_token)
         self.last_request_time = None
         self.rate_limit_delay = config.rate_limit_delay
+        self.agile_api_available = False
         
         # Set headers
         self.session.headers.update({
@@ -53,6 +54,10 @@ class JiraClient(BaseClient):
         
         # Verify connection
         self._verify_connection()
+        
+        # Check Agile API availability
+        self.agile_api_available = self._verify_agile_api()
+        
         logger.info("Jira client initialized successfully")
     
     def _verify_connection(self):
@@ -64,6 +69,16 @@ class JiraClient(BaseClient):
         except Exception as e:
             logger.error(f"Connection verification failed: {e}")
             raise
+    
+    def _verify_agile_api(self) -> bool:
+        """Check if Agile API is available."""
+        try:
+            self._make_jira_request("GET", "/rest/agile/1.0/board", params={"maxResults": 1})
+            logger.info("Agile API is available")
+            return True
+        except Exception as e:
+            logger.warning(f"Agile API not available: {e}")
+            return False
     
     def _rate_limit(self):
         """Implement basic rate limiting."""
@@ -310,6 +325,50 @@ class JiraClient(BaseClient):
         logger.info(f"Retrieved metadata for {project_key}/{issue_type_id}")
         return data
     
+    def get_creatable_issue_types(self, project_key: str) -> List[Dict]:
+        """
+        Get issue types that can be created in a project with basic info.
+        
+        Args:
+            project_key: Project key
+            
+        Returns:
+            List of issue types with metadata
+        """
+        logger.debug(f"Fetching creatable issue types for: {project_key}")
+        
+        response = self._make_jira_request(
+            "GET",
+            "/rest/api/3/issue/createmeta",
+            params={
+                "projectKeys": project_key,
+                "expand": "projects.issuetypes.fields"
+            }
+        )
+        data = response.json()
+        
+        issue_types = []
+        for project in data.get("projects", []):
+            for issuetype in project.get("issuetypes", []):
+                # Get required fields
+                fields = issuetype.get("fields", {})
+                required_fields = [
+                    {"key": key, "name": field.get("name", key)}
+                    for key, field in fields.items()
+                    if field.get("required", False)
+                ]
+                
+                issue_types.append({
+                    "id": issuetype["id"],
+                    "name": issuetype["name"],
+                    "description": issuetype.get("description", ""),
+                    "subtask": issuetype.get("subtask", False),
+                    "required_fields": required_fields
+                })
+        
+        logger.info(f"Found {len(issue_types)} creatable issue types")
+        return issue_types
+    
     def create_issue(
         self,
         project_key: str,
@@ -319,7 +378,7 @@ class JiraClient(BaseClient):
         priority: Optional[str] = None,
         assignee: Optional[str] = None,
         labels: Optional[List[str]] = None,
-        custom_fields: Optional[Dict] = None,
+        additional_fields: Optional[Dict] = None,
         rich_text: bool = False
     ) -> Dict:
         """
@@ -333,7 +392,7 @@ class JiraClient(BaseClient):
             priority: Priority name
             assignee: Assignee account ID
             labels: List of labels
-            custom_fields: Custom field values
+            additional_fields: Additional field values (custom fields, etc.)
             rich_text: Preserve formatting in description
             
         Returns:
@@ -357,8 +416,9 @@ class JiraClient(BaseClient):
         if labels:
             fields['labels'] = labels
         
-        if custom_fields:
-            fields.update(custom_fields)
+        # Merge additional fields - this is key for custom fields
+        if additional_fields:
+            fields.update(additional_fields)
         
         payload = {'fields': fields}
         
@@ -377,9 +437,18 @@ class JiraClient(BaseClient):
                 raise ValueError(f"Issue creation failed: {error_msg}")
             
             issue_key = data.get('key')
+            issue_url = f"{self.config.base_url}/browse/{issue_key}"
+            
             logger.info(f"Created issue: {issue_key}")
             
-            return data
+            # Return enhanced response
+            return {
+                "success": True,
+                "key": issue_key,
+                "id": data.get('id'),
+                "self": data.get('self'),
+                "url": issue_url
+            }
             
         except Exception as e:
             logger.error(f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}")
@@ -391,8 +460,7 @@ class JiraClient(BaseClient):
         Create multiple issues in a single API call.
         
         Args:
-            issues: List of issue definitions with keys:
-                   - project_key, summary, description, issue_type, priority (optional)
+            issues: List of issue definitions
             
         Returns:
             Results of bulk creation
@@ -414,6 +482,9 @@ class JiraClient(BaseClient):
             
             if issue.get('labels'):
                 fields['labels'] = issue['labels']
+            
+            if issue.get('additional_fields'):
+                fields.update(issue['additional_fields'])
             
             issue_updates.append({'fields': fields})
         
@@ -699,7 +770,6 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Adding watcher to {issue_key}")
         
-        # Note: POST body for add watcher is just the accountId as a string in quotes
         self._make_jira_request(
             "POST",
             f"/rest/api/3/issue/{issue_key}/watchers",
@@ -708,6 +778,176 @@ class JiraClient(BaseClient):
         
         logger.info(f"Added watcher to {issue_key}")
         return True
+    
+    # Sprint and Board Management Methods
+    
+    def get_boards(self, project_key: Optional[str] = None, max_results: int = 50) -> List[Dict]:
+        """
+        Get boards, optionally filtered by project.
+        
+        Args:
+            project_key: Optional project key filter
+            max_results: Maximum number of results (default: 50)
+            
+        Returns:
+            List of boards
+        """
+        if not self.agile_api_available:
+            raise ValueError("Agile API is not available for this Jira instance")
+        
+        logger.debug(f"Fetching boards for project: {project_key}")
+        
+        params = {
+            'maxResults': max_results,
+            'startAt': 0
+        }
+        if project_key:
+            params['projectKeyOrId'] = project_key
+        
+        response = self._make_jira_request(
+            "GET",
+            "/rest/agile/1.0/board",
+            params=params
+        )
+        data = response.json()
+        
+        boards = data.get('values', [])
+        total = data.get('total', len(boards))
+        logger.info(f"Found {len(boards)} boards (total: {total})")
+        
+        return boards
+    
+    def get_project_board(self, project_key: str) -> Optional[Dict]:
+        """
+        Get the primary board for a project.
+        
+        Args:
+            project_key: Project key
+            
+        Returns:
+            Board data or None if not found
+        """
+        logger.debug(f"Finding board for project: {project_key}")
+        
+        boards = self.get_boards(project_key)
+        
+        if boards:
+            # Return the first board (usually the main board)
+            logger.info(f"Found board {boards[0]['id']} for project {project_key}")
+            return boards[0]
+        
+        logger.warning(f"No board found for project {project_key}")
+        return None
+    
+    def get_board_sprints(self, board_id: str, state: str = "active", max_results: int = 50) -> List[Dict]:
+        """
+        Get sprints for a board.
+        
+        Args:
+            board_id: Board ID
+            state: Sprint state (active, future, closed)
+            max_results: Maximum number of results (default: 50)
+            
+        Returns:
+            List of sprints
+        """
+        if not self.agile_api_available:
+            raise ValueError("Agile API is not available for this Jira instance")
+        
+        logger.debug(f"Fetching {state} sprints for board: {board_id}")
+        
+        response = self._make_jira_request(
+            "GET",
+            f"/rest/agile/1.0/board/{board_id}/sprint",
+            params={"state": state, "maxResults": max_results}
+        )
+        data = response.json()
+        
+        sprints = data.get('values', [])
+        logger.info(f"Found {len(sprints)} {state} sprints")
+        
+        return sprints
+
+    def get_active_sprints(self, board_id: str) -> List[Dict]:
+        """
+        Get active sprints for a board.
+        
+        Args:
+            board_id: Board ID
+            
+        Returns:
+            List of active sprints
+        """
+        return self.get_board_sprints(board_id, "active")
+
+    def add_issues_to_sprint(self, sprint_id: int, issue_keys: List[str]) -> bool:
+        """
+        Add issues to a sprint using the Agile API.
+        
+        Args:
+            sprint_id: Sprint ID
+            issue_keys: List of issue keys to add
+            
+        Returns:
+            Success status
+        """
+        if not self.agile_api_available:
+            raise ValueError("Agile API is not available for this Jira instance")
+        
+        logger.debug(f"Adding {len(issue_keys)} issues to sprint {sprint_id}")
+        
+        payload = {
+            "issues": issue_keys
+        }
+        
+        self._make_jira_request(
+            "POST",
+            f"/rest/agile/1.0/sprint/{sprint_id}/issue",
+            json=payload
+        )
+        
+        logger.info(f"Added issues to sprint {sprint_id}")
+        return True
+    
+    def add_issue_to_active_sprint(self, issue_key: str, project_key: str) -> Dict:
+        """
+        Add an issue to the active sprint of its project.
+        
+        Args:
+            issue_key: Issue key
+            project_key: Project key
+            
+        Returns:
+            Result with sprint information
+        """
+        if not self.agile_api_available:
+            raise ValueError("Agile API is not available for this Jira instance")
+        
+        logger.debug(f"Adding {issue_key} to active sprint in {project_key}")
+        
+        # Get board
+        board = self.get_project_board(project_key)
+        if not board:
+            raise ValueError(f"No board found for project {project_key}")
+        
+        # Get active sprints
+        sprints = self.get_active_sprints(str(board['id']))
+        if not sprints:
+            raise ValueError(f"No active sprint found for board {board['id']}")
+        
+        # Add to first active sprint
+        sprint = sprints[0]
+        self.add_issues_to_sprint(sprint['id'], [issue_key])
+        
+        logger.info(f"Added {issue_key} to sprint {sprint['name']}")
+        
+        return {
+            "success": True,
+            "sprint_id": sprint['id'],
+            "sprint_name": sprint['name'],
+            "board_id": board['id'],
+            "board_name": board['name']
+        }
 
 
 # Initialize client
@@ -832,6 +1072,25 @@ def jira_get_project_issue_types(project_key: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
+def jira_get_creatable_issue_types(project_key: str) -> str:
+    """
+    Get issue types that can be created in a project with their required fields.
+    
+    Args:
+        project_key: Project key (e.g., "CGV2")
+        
+    Returns:
+        JSON string with creatable issue types and required fields
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    issue_types = jira_client.get_creatable_issue_types(project_key)
+    return json.dumps(issue_types, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
 def jira_get_create_metadata(project_key: str, issue_type_id: str) -> str:
     """
     Get field metadata for creating issues in a project.
@@ -860,7 +1119,7 @@ def jira_create_issue(
     priority: Optional[str] = None,
     assignee: Optional[str] = None,
     labels: Optional[str] = None,
-    custom_fields: Optional[str] = None,
+    additional_fields: Optional[dict] = None,
     rich_text: bool = False
 ) -> str:
     """
@@ -874,21 +1133,33 @@ def jira_create_issue(
         priority: Priority name (High, Medium, Low, etc.)
         assignee: Assignee account ID
         labels: JSON array of labels
-        custom_fields: JSON object with custom field values
+        additional_fields: Dict with custom field values (e.g., {"customfield_10031": 1})
         rich_text: Preserve paragraph formatting in description
         
     Returns:
-        JSON string with created issue including issue key
+        JSON string with created issue including issue key and URL
+        
+    Examples:
+        Basic issue:
+        jira_create_issue("CGV2", "Bug in login", "Users cannot login")
+        
+        With story points:
+        jira_create_issue("CGV2", "New feature", "Description", 
+                          additional_fields={"customfield_10031": 3})
+        
+        Full example:
+        jira_create_issue("CGV2", "Test Issue", "Testing", "Task", "Low",
+                          labels='["bug", "urgent"]',
+                          additional_fields={"customfield_10031": 1})
     """
     if not jira_client:
         return json.dumps({"error": "Jira client not initialized"})
     
     labels_list = json.loads(labels) if labels else None
-    custom_dict = json.loads(custom_fields) if custom_fields else None
     
     issue = jira_client.create_issue(
         project_key, summary, description, issue_type,
-        priority, assignee, labels_list, custom_dict, rich_text
+        priority, assignee, labels_list, additional_fields, rich_text
     )
     return json.dumps(issue, indent=2)
 
@@ -902,7 +1173,7 @@ def jira_create_issues_bulk(issues: str) -> str:
     Args:
         issues: JSON array of issue objects, each with:
                - project_key, summary, description (required)
-               - issue_type, priority, labels (optional)
+               - issue_type, priority, labels, additional_fields (optional)
         
     Returns:
         JSON string with bulk creation results
@@ -1140,6 +1411,90 @@ def jira_add_watcher(issue_key: str, account_id: str) -> str:
     
     result = jira_client.add_watcher(issue_key, account_id)
     return json.dumps({"success": result})
+
+
+# Sprint and Board Management Tools
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_get_boards(project_key: Optional[str] = None) -> str:
+    """
+    Get Jira boards, optionally filtered by project.
+    
+    Args:
+        project_key: Optional project key to filter boards
+        
+    Returns:
+        JSON string with list of boards and their IDs
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    boards = jira_client.get_boards(project_key)
+    return json.dumps(boards, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_get_active_sprints(board_id: str) -> str:
+    """
+    Get active sprints for a Jira board.
+    
+    Args:
+        board_id: Board ID (get from jira_get_boards)
+        
+    Returns:
+        JSON string with active sprints including sprint IDs and names
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    sprints = jira_client.get_active_sprints(board_id)
+    return json.dumps(sprints, indent=2)
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_add_to_sprint(sprint_id: int, issue_keys: str) -> str:
+    """
+    Add issues to a sprint.
+    
+    Args:
+        sprint_id: Sprint ID (get from jira_get_active_sprints)
+        issue_keys: JSON array of issue keys (e.g., ["CGV2-880", "CGV2-881"])
+        
+    Returns:
+        JSON string with success status
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    keys = json.loads(issue_keys)
+    result = jira_client.add_issues_to_sprint(sprint_id, keys)
+    return json.dumps({"success": result})
+
+
+@mcp.tool()
+@handle_errors(logger)
+def jira_add_issue_to_active_sprint(issue_key: str, project_key: str) -> str:
+    """
+    Add an issue to the active sprint (automatic sprint detection).
+    
+    Args:
+        issue_key: Issue key (e.g., "CGV2-880")
+        project_key: Project key (e.g., "CGV2")
+        
+    Returns:
+        JSON string with success status and sprint details
+        
+    Example:
+        jira_add_issue_to_active_sprint("CGV2-880", "CGV2")
+    """
+    if not jira_client:
+        return json.dumps({"error": "Jira client not initialized"})
+    
+    result = jira_client.add_issue_to_active_sprint(issue_key, project_key)
+    return json.dumps(result, indent=2)
 
 
 if __name__ == "__main__":
