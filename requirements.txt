@@ -4,6 +4,10 @@ pydantic>=2.6.0,<3.0.0
 requests>=2.32.3
 python-dotenv>=1.0.0
 
+# Web Dashboard
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
 # GitHub integration
 PyGithub>=2.5.0
 

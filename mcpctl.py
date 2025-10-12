@@ -16,9 +16,8 @@ import sys
 import os
 import time
 import subprocess
-import signal
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import List, Dict
 import click
 
 # Project paths
@@ -398,7 +397,7 @@ def status(verbose):
                     size = log_file.stat().st_size / 1024  # KB
                     click.echo(f"    Log: {log_file} ({size:.1f} KB)")
                 else:
-                    click.echo(f"    Log: {log_file} (not created yet)")
+                    click.echo(f"    Log: {str(log_file)} (not created yet)")
 
             click.echo()
 
@@ -552,6 +551,31 @@ def test(verbose, timeout):
 
 
 @cli.command()
+def dashboard():
+    """Start the web dashboard for monitoring servers"""
+    print_header("Starting MCP Dashboard")
+
+    dashboard_script = SERVERS_DIR / "dashboard_server.py"
+
+    if not dashboard_script.exists():
+        print_error(f"Dashboard script not found: {dashboard_script}")
+        sys.exit(1)
+
+    print_info("Starting web dashboard on http://localhost:8000")
+    print_info("Press CTRL+C to stop the dashboard")
+    click.echo()
+
+    try:
+        subprocess.run([sys.executable, str(dashboard_script)], cwd=PROJECT_ROOT)
+    except KeyboardInterrupt:
+        click.echo("\n")
+        print_success("Dashboard stopped")
+    except Exception as e:
+        print_error(f"Failed to start dashboard: {e}")
+        sys.exit(1)
+
+
+@cli.command()
 def config():
     """Show current configuration and environment"""
     print_header("MCP Configuration")
@@ -610,6 +634,8 @@ def config():
 @click.argument("server")
 def restart(server):
     """Restart a specific server (stop then validate config)"""
+    import psutil  # Import here to avoid unused import warning
+
     print_header(f"Restarting {server}")
 
     # Normalize server name
@@ -626,11 +652,6 @@ def restart(server):
     server_info = SERVERS[server_key]
 
     # Find and stop the server
-    try:
-        import psutil
-    except ImportError:
-        print_error("psutil not installed. Install with: pip install psutil")
-        sys.exit(1)
 
     server_processes = find_server_processes()
     found = False

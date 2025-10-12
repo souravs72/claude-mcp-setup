@@ -10,14 +10,15 @@ pip install -e .
 
 ### Basic Operations
 
-| Command            | Description            |
-| ------------------ | ---------------------- |
-| `mcpctl --version` | Show version           |
-| `mcpctl --help`    | Show help              |
-| `mcpctl start`     | Validate configuration |
-| `mcpctl stop`      | Stop all servers       |
-| `mcpctl status`    | Check running servers  |
-| `mcpctl config`    | Show configuration     |
+| Command            | Description                |
+| ------------------ | -------------------------- |
+| `mcpctl --version` | Show version               |
+| `mcpctl --help`    | Show help                  |
+| `mcpctl start`     | Validate configuration     |
+| `mcpctl stop`      | Stop all servers           |
+| `mcpctl status`    | Check running servers      |
+| `mcpctl config`    | Show configuration         |
+| `mcpctl dashboard` | Start web dashboard (8000) |
 
 ### Testing
 
@@ -76,6 +77,9 @@ mcpctl status
 ### Daily Development
 
 ```bash
+# Start web dashboard
+mcpctl dashboard
+
 # Check what's running
 mcpctl status -v
 

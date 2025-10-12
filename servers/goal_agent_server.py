@@ -4,6 +4,7 @@ Goal-Based AI Agent MCP Server
 Manages goals, tasks, and execution plans with automatic Redis cache persistence
 Goals and plans are automatically cached so LLM sessions remember them instantly
 """
+
 import json
 import sys
 import atexit
@@ -20,8 +21,17 @@ from mcp.server.fastmcp import FastMCP
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
-from servers.config import load_env_file, GoalAgentConfig, validate_config, ConfigurationError
+from servers.logging_config import (
+    setup_logging,
+    log_server_startup,
+    log_server_shutdown,
+)
+from servers.config import (
+    load_env_file,
+    GoalAgentConfig,
+    validate_config,
+    ConfigurationError,
+)
 from servers.base_client import handle_errors
 
 # Initialize
@@ -68,6 +78,7 @@ class Task:
     estimated_effort: str | None = None
     assigned_tools: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: str | None = None
     result: Any | None = None
 
@@ -97,12 +108,12 @@ class CacheLayer:
         self.cache_prefix = "goal_agent"
         self.enabled = enabled
         self.redis_client: Any = None
-        
+
         if enabled:
             try:
                 import redis
                 from servers.config import RedisConfig
-                
+
                 # Initialize Redis with configuration
                 redis_config = RedisConfig()
                 self.redis_client = redis.Redis(
@@ -114,11 +125,13 @@ class CacheLayer:
                     socket_timeout=redis_config.socket_timeout,
                     socket_connect_timeout=redis_config.socket_connect_timeout,
                 )
-                
+
                 # Test connection
                 self.redis_client.ping()
-                logger.info(f"Redis cache connected - {redis_config.host}:{redis_config.port}")
-                
+                logger.info(
+                    f"Redis cache connected - {redis_config.host}:{redis_config.port}"
+                )
+
             except ImportError:
                 logger.warning("Redis not installed - caching disabled")
                 self.enabled = False
@@ -269,10 +282,63 @@ class GoalAgent:
             raise RuntimeError("Executor not initialized")
         return self._executor
 
+    def _load_from_files(self) -> bool:
+        """Load goals and tasks from JSON files."""
+        goals_file = project_root / "data" / "goals" / "goals.json"
+        tasks_file = project_root / "data" / "goals" / "tasks.json"
+        counters_file = project_root / "data" / "goals" / "counters.json"
+
+        loaded_any = False
+
+        try:
+            # Load goals
+            if goals_file.exists():
+                with open(goals_file, "r") as f:
+                    goals_data = json.load(f)
+                    for goal_id, goal_dict in goals_data.items():
+                        self.goals[goal_id] = Goal(**goal_dict)
+                    logger.info(f"Loaded {len(goals_data)} goals from file")
+                    loaded_any = True
+
+            # Load tasks
+            if tasks_file.exists():
+                with open(tasks_file, "r") as f:
+                    tasks_data = json.load(f)
+                    for task_id, task_dict in tasks_data.items():
+                        self.tasks[task_id] = Task(**task_dict)
+                    logger.info(f"Loaded {len(tasks_data)} tasks from file")
+                    loaded_any = True
+
+            # Load counters
+            if counters_file.exists():
+                with open(counters_file, "r") as f:
+                    counters = json.load(f)
+                    self.goal_counter = counters.get("goal", 0)
+                    self.task_counter = counters.get("task", 0)
+                    logger.info(
+                        f"Loaded counters: goal={self.goal_counter}, task={self.task_counter}"
+                    )
+
+            return loaded_any
+
+        except Exception as e:
+            logger.error(f"Failed to load from files: {e}")
+            return False
+
     def _load_from_cache(self) -> None:
         """Load goals and tasks from cache on startup."""
+        # First try to load from files
+        loaded_from_files = self._load_from_files()
+
+        if loaded_from_files:
+            logger.info("Loaded state from files, syncing to cache...")
+            # Save to cache so Redis is updated
+            self._save_full_state()
+            return
+
+        # If no files, try cache
         if not self.cache.is_available():
-            logger.info("Cache not available, starting fresh")
+            logger.info("Cache not available and no files found, starting fresh")
             return
 
         try:
@@ -283,11 +349,13 @@ class GoalAgent:
                 logger.info("Found cached state, restoring...")
                 self.restore_from_cache(state)
             else:
-                logger.info("No cached state found, starting fresh")
+                logger.info("No cached state or files found, starting fresh")
         except Exception as e:
             logger.error(f"Failed to load from cache: {e}")
 
-    def _persist_to_cache(self, entity_type: str, entity_id: str, data: dict[str, Any]) -> None:
+    def _persist_to_cache(
+        self, entity_type: str, entity_id: str, data: dict[str, Any]
+    ) -> None:
         """
         Persist an entity to cache.
 
@@ -302,7 +370,7 @@ class GoalAgent:
         try:
             cache_key = self.cache.get_cache_key(entity_type, entity_id)
             self.cache.cache_set(cache_key, data, ttl=604800)  # 7 days
-            
+
             # Also update full state
             self._save_full_state()
         except Exception as e:
@@ -399,7 +467,7 @@ class GoalAgent:
 
             self.tasks[task_id] = task
             goal.tasks.append(task_id)
-            
+
             # Persist task to cache
             self._persist_to_cache("task", task_id, task.to_dict())
 
@@ -407,7 +475,7 @@ class GoalAgent:
 
         goal.updated_at = datetime.now().isoformat()
         goal.status = "in_progress"
-        
+
         # Persist updated goal to cache
         self._persist_to_cache("goal", goal_id, goal.to_dict())
 
@@ -424,13 +492,15 @@ class GoalAgent:
             result = goal.to_dict()
 
             result["task_details"] = [
-                self.tasks[task_id].to_dict() for task_id in goal.tasks if task_id in self.tasks
+                self.tasks[task_id].to_dict()
+                for task_id in goal.tasks
+                if task_id in self.tasks
             ]
 
             # Add cache info
             result["_cache_status"] = {
                 "enabled": self.cache.is_available(),
-                "key": self.cache.get_cache_key("goal", goal_id)
+                "key": self.cache.get_cache_key("goal", goal_id),
             }
 
             return result
@@ -458,7 +528,9 @@ class GoalAgent:
         return goals
 
     @with_lock
-    def update_task_status(self, task_id: str, status: str, result: Any | None = None) -> Task:
+    def update_task_status(
+        self, task_id: str, status: str, result: Any | None = None
+    ) -> Task:
         """Update task status and result."""
         if task_id not in self.tasks:
             raise ValueError(f"Task {task_id} not found")
@@ -477,7 +549,7 @@ class GoalAgent:
             task.completed_at = datetime.now().isoformat()
 
         logger.info(f"Task {task_id} status: {old_status} -> {status}")
-        
+
         # Persist updated task to cache
         self._persist_to_cache("task", task_id, task.to_dict())
 
@@ -505,7 +577,9 @@ class GoalAgent:
                 if goal_id not in self.goals:
                     raise ValueError(f"Goal {goal_id} not found")
                 task_ids = self.goals[goal_id].tasks
-                tasks_to_check = [self.tasks[tid] for tid in task_ids if tid in self.tasks]
+                tasks_to_check = [
+                    self.tasks[tid] for tid in task_ids if tid in self.tasks
+                ]
             else:
                 tasks_to_check = list(self.tasks.values())
 
@@ -518,7 +592,14 @@ class GoalAgent:
                 dependencies_met = all(
                     self.tasks.get(
                         dep_id,
-                        Task(id="", goal_id="", description="", type="", status="", priority=""),
+                        Task(
+                            id="",
+                            goal_id="",
+                            description="",
+                            type="",
+                            status="",
+                            priority="",
+                        ),
                     ).status
                     == "completed"
                     for dep_id in task.dependencies
@@ -542,7 +623,7 @@ class GoalAgent:
             task = self.tasks[task_id].to_dict()
             task["_cache_status"] = {
                 "enabled": self.cache.is_available(),
-                "key": self.cache.get_cache_key("task", task_id)
+                "key": self.cache.get_cache_key("task", task_id),
             }
             return task
 
@@ -578,7 +659,8 @@ class GoalAgent:
 
                 for task in remaining_tasks[:]:
                     dependencies_met = all(
-                        dep_id in completed_task_ids or dep_id not in [t.id for t in tasks]
+                        dep_id in completed_task_ids
+                        or dep_id not in [t.id for t in tasks]
                         for dep_id in task.dependencies
                     )
 
@@ -623,7 +705,11 @@ class GoalAgent:
         logger.info(f"Batch updating {len(updates)} tasks")
 
         futures: dict[Any, str] = {}
-        results: dict[str, Any] = {"successful": [], "failed": [], "total": len(updates)}
+        results: dict[str, Any] = {
+            "successful": [],
+            "failed": [],
+            "total": len(updates),
+        }
 
         for update in updates:
             task_id = update.get("task_id")
@@ -631,17 +717,23 @@ class GoalAgent:
             result = update.get("result")
 
             if not task_id or not status:
-                results["failed"].append({"task_id": task_id, "error": "Missing task_id or status"})
+                results["failed"].append(
+                    {"task_id": task_id, "error": "Missing task_id or status"}
+                )
                 continue
 
-            future = self.executor.submit(self.update_task_status, task_id, status, result)
+            future = self.executor.submit(
+                self.update_task_status, task_id, status, result
+            )
             futures[future] = task_id
 
         for future in as_completed(futures):
             task_id = futures[future]
             try:
                 updated_task = future.result()
-                results["successful"].append({"task_id": task_id, "status": updated_task.status})
+                results["successful"].append(
+                    {"task_id": task_id, "status": updated_task.status}
+                )
             except Exception as e:
                 results["failed"].append({"task_id": task_id, "error": str(e)})
                 logger.error(f"Failed to update {task_id}: {e}")
@@ -683,7 +775,9 @@ class GoalAgent:
         goal_id = task.goal_id
 
         # Check if other tasks depend on this one
-        dependent_tasks = [t.id for t in self.tasks.values() if task_id in t.dependencies]
+        dependent_tasks = [
+            t.id for t in self.tasks.values() if task_id in t.dependencies
+        ]
 
         if dependent_tasks:
             logger.warning(f"Task {task_id} has dependent tasks: {dependent_tasks}")
@@ -727,11 +821,11 @@ class GoalAgent:
                 self.cache.cache_delete([task_cache_key])
 
         del self.goals[goal_id]
-        
+
         # Delete goal from cache
         goal_cache_key = self.cache.get_cache_key("goal", goal_id)
         self.cache.cache_delete([goal_cache_key])
-        
+
         # Update full state
         self._save_full_state()
 
@@ -782,7 +876,7 @@ class GoalAgent:
             goal.metadata.update(metadata)
 
         goal.updated_at = datetime.now().isoformat()
-        
+
         # Persist to cache
         self._persist_to_cache("goal", goal_id, goal.to_dict())
 
@@ -806,12 +900,14 @@ class GoalAgent:
             with self.lock:
                 # Restore goals
                 self.goals = {
-                    gid: Goal(**goal_data) for gid, goal_data in state.get("goals", {}).items()
+                    gid: Goal(**goal_data)
+                    for gid, goal_data in state.get("goals", {}).items()
                 }
 
                 # Restore tasks
                 self.tasks = {
-                    tid: Task(**task_data) for tid, task_data in state.get("tasks", {}).items()
+                    tid: Task(**task_data)
+                    for tid, task_data in state.get("tasks", {}).items()
                 }
 
                 # Restore counters
@@ -895,10 +991,12 @@ def create_goal(
 
     goal = agent.create_goal(description, priority, repos_list, metadata_dict)
     result = goal.to_dict()
-    
+
     result["_cache_status"] = {
         "persisted": agent.cache.is_available(),
-        "message": "Goal automatically saved to Redis" if agent.cache.is_available() else "Cache disabled"
+        "message": "Goal automatically saved to Redis"
+        if agent.cache.is_available()
+        else "Cache disabled",
     }
 
     return json.dumps(result, indent=2)
@@ -911,10 +1009,12 @@ def break_down_goal(goal_id: str, subtasks: str) -> str:
     subtasks_list = json.loads(subtasks)
     goal = agent.break_down_goal(goal_id, subtasks_list)
     result = goal.to_dict()
-    
+
     result["_cache_status"] = {
         "persisted": agent.cache.is_available(),
-        "message": "Tasks automatically saved to Redis" if agent.cache.is_available() else "Cache disabled"
+        "message": "Tasks automatically saved to Redis"
+        if agent.cache.is_available()
+        else "Cache disabled",
     }
 
     return json.dumps(result, indent=2)
@@ -956,10 +1056,12 @@ def update_task_status(task_id: str, status: str, result: str | None = None) -> 
     result_dict = json.loads(result) if result else None
     task = agent.update_task_status(task_id, status, result_dict)
     task_result = task.to_dict()
-    
+
     task_result["_cache_status"] = {
         "persisted": agent.cache.is_available(),
-        "message": "Task status saved to Redis" if agent.cache.is_available() else "Cache disabled"
+        "message": "Task status saved to Redis"
+        if agent.cache.is_available()
+        else "Cache disabled",
     }
 
     return json.dumps(task_result, indent=2)
@@ -1011,12 +1113,16 @@ def update_goal(
     repos_list = json.loads(repos) if repos else None
     metadata_dict = json.loads(metadata) if metadata else None
 
-    goal = agent.update_goal(goal_id, description, priority, status, repos_list, metadata_dict)
+    goal = agent.update_goal(
+        goal_id, description, priority, status, repos_list, metadata_dict
+    )
     result = goal.to_dict()
-    
+
     result["_cache_status"] = {
         "persisted": agent.cache.is_available(),
-        "message": "Goal updated in Redis" if agent.cache.is_available() else "Cache disabled"
+        "message": "Goal updated in Redis"
+        if agent.cache.is_available()
+        else "Cache disabled",
     }
 
     return json.dumps(result, indent=2)
@@ -1045,14 +1151,11 @@ def batch_get_tasks(task_ids: str) -> str:
 def save_state_to_cache() -> str:
     """Manually save all goals and tasks to cache."""
     if not agent.cache.is_available():
-        return json.dumps({
-            "success": False,
-            "error": "Cache not available"
-        })
-    
+        return json.dumps({"success": False, "error": "Cache not available"})
+
     agent._save_full_state()
     state = agent.get_cache_state()
-    
+
     result = {
         "success": True,
         "state_snapshot": {
@@ -1060,7 +1163,7 @@ def save_state_to_cache() -> str:
             "tasks_count": len(state["tasks"]),
             "timestamp": state["timestamp"],
         },
-        "message": "Full state saved to Redis cache"
+        "message": "Full state saved to Redis cache",
     }
 
     return json.dumps(result, indent=2)
@@ -1077,7 +1180,9 @@ def restore_state_from_cache(state_json: str) -> str:
         result = {
             "success": success,
             "restored": {"goals": len(agent.goals), "tasks": len(agent.tasks)},
-            "message": "State restored successfully" if success else "Failed to restore state",
+            "message": "State restored successfully"
+            if success
+            else "Failed to restore state",
         }
 
         return json.dumps(result, indent=2)
