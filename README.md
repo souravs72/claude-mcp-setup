@@ -9,6 +9,7 @@ Enterprise-grade Model Context Protocol servers extending Claude with GitHub, Ji
 ## 🎯 What This Does
 
 Transforms Claude into a full-stack development assistant with:
+
 - **Goal-Based Task Orchestration** - Break complex projects into executable tasks with dependency resolution
 - **Multi-Platform Integration** - GitHub (code), Jira (tickets), Frappe (ERP), Google (search)
 - **Persistent State Management** - Redis-backed caching with automatic state persistence
@@ -85,6 +86,7 @@ User: "Create a goal to add OAuth to our API"
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 ```bash
 # Required
 Python 3.10+
@@ -105,8 +107,8 @@ Frappe/ERPNext instance
 git clone <your-repo-url>
 cd claude-mcp-setup
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Install dependencies and CLI tool
+pip install -e .  # Installs mcpctl CLI + all dependencies
 
 # 3. Configure environment
 cp .env.example .env
@@ -122,18 +124,22 @@ sudo systemctl start redis
 # Docker
 docker run -d -p 6379:6379 redis:alpine
 
-# 5. Test configuration
-python scripts/start_all_servers.py
+# 5. Validate configuration using mcpctl
+mcpctl start       # Check configuration
+mcpctl test        # Run integration tests
+mcpctl config      # View detailed config
 ```
 
 ### Claude Desktop Configuration
 
 **Config Location:**
+
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Linux: `~/.config/Claude/claude_desktop_config.json`
 
 **Add to config file:**
+
 ```json
 {
   "mcpServers": {
@@ -179,6 +185,17 @@ python scripts/start_all_servers.py
 
 ## 🧪 Test Installation
 
+### Command Line Tests
+
+```bash
+# Using mcpctl (recommended)
+mcpctl test         # Run all integration tests
+mcpctl status       # Check server status
+mcpctl logs --all   # View all logs
+```
+
+### Claude Desktop Tests
+
 ```
 # In Claude Desktop:
 
@@ -197,14 +214,14 @@ Expected: ✓ Found N repositories
 
 ## 📦 Available Servers
 
-| Server | Purpose | Tools | Dependencies | Status |
-|--------|---------|-------|--------------|--------|
-| **memory-cache** | Redis caching with TTL | 12 | redis | Required |
-| **goal-agent** | Task orchestration | 13 | - | Required |
-| **github** | Code management | 10 | PyGithub | Optional |
-| **jira** | Issue tracking | 18 | - | Optional |
-| **internet** | Web search/fetch | 6 | - | Optional |
-| **frappe** | ERP integration | 5 | - | Optional |
+| Server           | Purpose                | Tools | Dependencies | Status   |
+| ---------------- | ---------------------- | ----- | ------------ | -------- |
+| **memory-cache** | Redis caching with TTL | 12    | redis        | Required |
+| **goal-agent**   | Task orchestration     | 13    | -            | Required |
+| **github**       | Code management        | 10    | PyGithub     | Optional |
+| **jira**         | Issue tracking         | 18    | -            | Optional |
+| **internet**     | Web search/fetch       | 6     | -            | Optional |
+| **frappe**       | ERP integration        | 5     | -            | Optional |
 
 ## 🎓 Real-World Example
 
@@ -306,7 +323,7 @@ class BaseClient:
     - Error parsing
     - Request logging
     """
-    
+
     def __init__(
         self,
         base_url: str,
@@ -320,6 +337,7 @@ class BaseClient:
 ```
 
 **Features:**
+
 - Automatic retries on 5xx errors and 429 (rate limits)
 - Connection pooling for performance
 - Structured error responses
@@ -336,17 +354,18 @@ class GitHubConfig(BaseConfig):
     timeout: int = 30
     max_retries: int = 3
     default_branch: str = "main"
-    
+
     def __post_init__(self):
         # Validates token format
         if not self.token.startswith(("ghp_", "github_pat_")):
             raise ValueError("Invalid token format")
-    
+
     def get_required_fields(self) -> list[str]:
         return ["token"]
 ```
 
 **Validation:**
+
 - Required field checking
 - URL format validation
 - Credential format verification
@@ -365,11 +384,12 @@ def tool_function(...) -> str:
 ```
 
 **Error Response Format:**
+
 ```json
 {
   "error": "Description of what went wrong",
   "type": "validation|timeout|connection|http_error",
-  "status_code": 404  // Only for HTTP errors
+  "status_code": 404 // Only for HTTP errors
 }
 ```
 
@@ -394,6 +414,7 @@ logger.critical("Redis connection lost")  # Fatal
 ### 1. Dependency Resolution
 
 Tasks can depend on other tasks - the Goal Agent automatically:
+
 - Validates all dependencies exist
 - Detects circular dependencies
 - Calculates execution phases
@@ -432,8 +453,9 @@ create_goal(...)
 ```
 
 **Cache Keys:**
+
 - `goal_agent:goal:{id}` - Individual goals
-- `goal_agent:task:{id}` - Individual tasks  
+- `goal_agent:task:{id}` - Individual tasks
 - `goal_agent:state:full` - Complete state snapshot
 
 ### 3. Thread Safety
@@ -490,16 +512,17 @@ Reduces latency and resource usage for repeated requests.
 
 ## 📊 Performance Characteristics
 
-| Operation | Latency | Throughput | Notes |
-|-----------|---------|------------|-------|
-| `create_goal` | <1ms | 1000+/s | In-memory only |
-| `cache_set` | <5ms | 10k+/s | Redis local |
-| `github:create_branch` | ~200ms | Limited by API | Network + GitHub |
-| `jira:create_issue` | ~300ms | Limited by API | Network + Jira |
-| `batch_update_tasks(10)` | ~50ms | Parallel | ThreadPoolExecutor |
-| `generate_execution_plan` | <10ms | Fast | Dependency DAG traversal |
+| Operation                 | Latency | Throughput     | Notes                    |
+| ------------------------- | ------- | -------------- | ------------------------ |
+| `create_goal`             | <1ms    | 1000+/s        | In-memory only           |
+| `cache_set`               | <5ms    | 10k+/s         | Redis local              |
+| `github:create_branch`    | ~200ms  | Limited by API | Network + GitHub         |
+| `jira:create_issue`       | ~300ms  | Limited by API | Network + Jira           |
+| `batch_update_tasks(10)`  | ~50ms   | Parallel       | ThreadPoolExecutor       |
+| `generate_execution_plan` | <10ms   | Fast           | Dependency DAG traversal |
 
 **Optimization Tips:**
+
 - Use batch operations for multiple updates
 - Increase `GOAL_AGENT_MAX_WORKERS` for more parallelism
 - Configure connection pool sizes for high throughput
@@ -508,16 +531,19 @@ Reduces latency and resource usage for repeated requests.
 ## 🔒 Security Considerations
 
 1. **Credentials Storage**
+
    - `.env` file (gitignored)
    - Environment variables only
    - No hardcoded secrets
 
 2. **API Tokens**
+
    - Personal access tokens (limited scope)
    - API keys with least privilege
    - Regular rotation recommended
 
 3. **Network Security**
+
    - HTTPS for all external APIs
    - Redis on localhost only (default)
    - No exposed ports
@@ -529,10 +555,46 @@ Reduces latency and resource usage for repeated requests.
 
 ## 🧰 Operations Guide
 
+### CLI Management Tool (mcpctl)
+
+**NEW: Interactive CLI toolkit for simplified local management and CI/CD**
+
+```bash
+# Install mcpctl
+pip install -e .
+
+# Validate configuration and check servers
+mcpctl start
+
+# Check running servers
+mcpctl status
+mcpctl status --verbose  # Detailed view
+
+# View logs in real-time
+mcpctl logs github --follow
+mcpctl logs memory-cache -n 100
+
+# Run integration tests
+mcpctl test
+mcpctl test --verbose
+
+# Stop all servers
+mcpctl stop
+
+# Show configuration
+mcpctl config
+```
+
+**See [MCPCTL_GUIDE.md](MCPCTL_GUIDE.md) for complete documentation.**
+
 ### Monitoring
 
 ```bash
-# View logs in real-time
+# Using mcpctl (recommended)
+mcpctl status -v
+mcpctl logs goal-agent -f
+
+# Manual monitoring
 tail -f logs/goal_agent_server.log
 tail -f logs/memory_cache_server.log
 
@@ -547,6 +609,10 @@ ps aux | grep "server.py"
 ### Troubleshooting
 
 ```bash
+# Quick validation
+mcpctl config
+mcpctl test -v
+
 # Test servers independently
 python servers/memory_cache_server.py  # Should start without errors
 python servers/goal_agent_server.py
@@ -564,8 +630,12 @@ python -c "from servers.github_server import github_client; print('OK')"
 ### Maintenance
 
 ```bash
-# Clear Redis cache
-redis-cli FLUSHDB
+# Using mcpctl
+mcpctl test           # Validate all servers
+mcpctl stop           # Stop all servers
+
+# Manual commands
+redis-cli FLUSHDB     # Clear Redis cache
 
 # Rotate logs (automatic at 10MB)
 # Or manually:
@@ -573,13 +643,11 @@ rm logs/*.log.1 logs/*.log.2
 
 # Update dependencies
 pip install -r requirements.txt --upgrade
-
-# Stop all servers
-python scripts/stop_all_servers.py
 ```
 
 ## 📚 Documentation
 
+- **[MCPCTL_GUIDE.md](MCPCTL_GUIDE.md)** - CLI toolkit reference (NEW!)
 - **[QUICKSTART.md](docs/QUICKSTART.md)** - 5-minute setup guide
 - **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Environment configuration
 - **[README_GOAL_AGENT.md](docs/README_GOAL_AGENT.md)** - Goal Agent API reference

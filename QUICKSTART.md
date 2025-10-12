@@ -17,14 +17,15 @@ git clone <your-repo-url>
 cd claude-mcp-setup
 
 # Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install all dependencies
-pip install -r requirements.txt
+# Install all dependencies and CLI tool
+pip install -e .[all]
 
 # Verify installation
 python -c "import mcp, redis, github; print('✓ All packages installed')"
+mcpctl --version  # Should show: mcpctl version 1.0.0
 ```
 
 ## Step 2: Start Redis (1 minute)
@@ -72,7 +73,7 @@ docker exec redis redis-cli ping  # Should return: PONG
 cp .env.example .env
 
 # Edit .env file
-nano .env  # Or use your preferred editor
+nano .env
 ```
 
 ### Minimum Configuration
@@ -129,19 +130,27 @@ FRAPPE_API_SECRET=your_secret
 ## Step 4: Test Configuration (1 minute)
 
 ```bash
-# Run configuration checker
-python scripts/start_all_servers.py
+# NEW: Use mcpctl for validation (recommended)
+mcpctl config       # View detailed configuration
+mcpctl start        # Validate all servers
+mcpctl test         # Run integration tests
 
 # Expected output:
-# ✓ Server Files: 6/6 found
-# ✓ Redis Server: Running
-# ✓ Environment: X/Y variables set
+# ✓ Server Files: All 6 found
+# ✓ Redis: Running
+# ✓ Environment: All variables configured
+```
+
+**Alternative (old method):**
+```bash
+python scripts/start_all_servers.py
 ```
 
 If you see errors, check:
-- Redis is running: `redis-cli ping`
+- Redis is running: `redis-cli ping` or `mcpctl config`
 - Python version: `python --version` (need 3.10+)
 - Dependencies installed: `pip list | grep mcp`
+- Run: `mcpctl config` for detailed diagnostics
 
 ## Step 5: Configure Claude Desktop (2 minutes)
 
@@ -262,6 +271,25 @@ Replace `/absolute/path/to/your/project` with the output from `pwd`:
 
 ## Step 7: Verify Installation (2 minutes)
 
+### Command Line Verification
+
+```bash
+# Check if servers are running
+mcpctl status
+
+# View server logs
+mcpctl logs --all
+
+# Run integration tests
+mcpctl test
+
+# Expected:
+# ✓ All servers responding
+# ✓ Tests passing
+```
+
+### Claude Desktop Tests
+
 Open Claude Desktop and try these tests:
 
 ### Test 1: Memory Cache
@@ -344,28 +372,49 @@ Claude will:
 
 ## 🔍 Troubleshooting
 
+### Quick Diagnostics with mcpctl
+
+```bash
+# 1. Check configuration
+mcpctl config      # Shows all settings and env vars
+
+# 2. Validate servers
+mcpctl start       # Checks all prerequisites
+
+# 3. Run tests
+mcpctl test -v     # Detailed test output
+
+# 4. Check status
+mcpctl status -v   # Shows running servers
+
+# 5. View logs
+mcpctl logs --all  # All server logs
+```
+
 ### Servers Not Appearing in Claude
 
 **Symptom:** Claude says "I don't have access to..."
 
 **Solutions:**
 ```bash
-# 1. Check paths are absolute
+# 1. Quick check with mcpctl
+mcpctl config      # Verify all paths and env vars
+mcpctl status      # Check if servers are running
+
+# 2. Check paths are absolute
 grep "servers/" ~/Library/Application\ Support/Claude/claude_desktop_config.json
 # All paths must start with / not ./
 
-# 2. Check Claude Desktop fully restarted
+# 3. Check Claude Desktop fully restarted
 ps aux | grep Claude  # macOS/Linux
 # Should show process with recent start time
 
-# 3. Check server files exist
-ls -l /path/to/servers/*.py
-# All should be present
+# 4. Check server files exist
+mcpctl start       # Will show missing files
 
-# 4. Check logs
-tail -f logs/goal_agent_server.log
-tail -f logs/memory_cache_server.log
-# Look for startup messages or errors
+# 5. Check logs
+mcpctl logs github -f     # Follow logs in real-time
+mcpctl logs goal-agent    # View recent logs
 ```
 
 ### Redis Connection Errors
@@ -374,15 +423,21 @@ tail -f logs/memory_cache_server.log
 
 **Solutions:**
 ```bash
-# 1. Verify Redis is running
+# 1. Quick check with mcpctl
+mcpctl config      # Shows Redis status
+
+# 2. Verify Redis is running
 redis-cli ping
 # Should return: PONG
 
-# 2. Check Redis port
+# 3. Check Redis port
 redis-cli -p 6379 ping
 # Change port in .env if needed
 
-# 3. Check Redis logs
+# 4. View cache server logs
+mcpctl logs memory-cache -f
+
+# 5. Check Redis logs
 tail -f /usr/local/var/log/redis.log  # macOS
 journalctl -u redis  # Linux
 docker logs redis  # Docker
@@ -506,26 +561,45 @@ Now that everything is working:
 
 ## 💡 Pro Tips
 
-1. **Use absolute paths everywhere** in claude_desktop_config.json
-2. **Always fully restart Claude Desktop** after config changes
-3. **Check logs first** when troubleshooting
-4. **Start minimal** (cache + goal agent only) then add integrations
-5. **Test Redis separately** before blaming MCP servers
+1. **Use mcpctl for all operations** - faster and more reliable
+2. **Use absolute paths everywhere** in claude_desktop_config.json
+3. **Always fully restart Claude Desktop** after config changes
+4. **Check logs first** when troubleshooting: `mcpctl logs --all`
+5. **Start minimal** (cache + goal agent only) then add integrations
+6. **Test Redis separately** before blaming MCP servers
 
-## 📝 Useful Commands
+## 📝 Essential mcpctl Commands
+
+```bash
+# Configuration & Validation
+mcpctl config        # Show all configuration
+mcpctl start         # Validate servers
+mcpctl test          # Run integration tests
+
+# Monitoring & Status
+mcpctl status        # List running servers
+mcpctl status -v     # Detailed view with logs
+
+# Log Management
+mcpctl logs github -f           # Follow GitHub logs
+mcpctl logs memory-cache -n 100 # Last 100 lines
+mcpctl logs --all               # All server logs
+
+# Server Management
+mcpctl stop          # Stop all servers
+mcpctl restart github # Restart specific server
+```
+
+## 📝 Other Useful Commands
 
 ```bash
 # Check if Redis is running
 redis-cli ping
+mcpctl config  # Also shows Redis status
 
 # View server processes
 ps aux | grep server.py
-
-# View logs in real-time
-tail -f logs/*.log
-
-# Stop all servers (if needed)
-python scripts/stop_all_servers.py
+mcpctl status  # Better alternative
 
 # Restart Redis (if needed)
 brew services restart redis  # macOS
@@ -534,23 +608,23 @@ docker restart redis  # Docker
 
 # Clear Redis cache (fresh start)
 redis-cli FLUSHDB
-
-# Test configuration
-python scripts/start_all_servers.py
 ```
 
 ## 🆘 Getting Help
 
 If you're still stuck:
 
-1. Check the [troubleshooting section](#-troubleshooting) above
-2. Review logs: `tail -f logs/*.log`
-3. Verify Redis: `redis-cli ping`
-4. Check config: `cat claude_desktop_config.json`
-5. Test Python environment: `python -c "import mcp; print('OK')"`
+1. Run diagnostics: `mcpctl config` and `mcpctl test -v`
+2. Check the [troubleshooting section](#-troubleshooting) above
+3. Review logs: `mcpctl logs --all`
+4. Verify Redis: `mcpctl config` or `redis-cli ping`
+5. Check config: `cat claude_desktop_config.json`
+6. Test Python environment: `python -c "import mcp; print('OK')"`
 
 Most issues are due to:
 - Relative paths instead of absolute paths
 - Claude Desktop not fully restarted
 - Redis not running
 - Missing environment variables
+
+**Use `mcpctl config` as your first diagnostic tool!**

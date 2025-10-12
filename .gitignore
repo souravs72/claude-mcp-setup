@@ -12,7 +12,7 @@ mcp-env/
 data/
 
 # Logs and PIDs
-logs/*.log
+logs/
 pids/*.pid
 
 # IDE
