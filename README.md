@@ -12,7 +12,7 @@ Transforms Claude into a full-stack development assistant with:
 
 - **Goal-Based Task Orchestration** - Break complex projects into executable tasks with dependency resolution
 - **Multi-Platform Integration** - GitHub (code), Jira (tickets), Frappe (ERP), Google (search)
-- **Persistent State Management** - Redis-backed caching with automatic state persistence
+- **Persistent State Management** - PostgreSQL for durable storage, Redis for optional caching
 - **Production-Ready Architecture** - Connection pooling, retry logic, rate limiting, comprehensive logging
 
 ## 🏗️ System Architecture
@@ -31,9 +31,9 @@ Transforms Claude into a full-stack development assistant with:
 │  Goal Agent   │    │ Memory Cache │    │   Internet   │
 │               │    │              │    │              │
 │ • Planning    │    │ • Redis      │    │ • Google     │
-│ • Tasks       │◄───┤ • TTL        │    │   Search     │
-│ • Deps        │    │ • Patterns   │    │ • Web Fetch  │
-│ • Execution   │    │ • Bulk Ops   │    │ • Batch      │
+│ • PostgreSQL  │◄───┤ • Caching    │    │   Search     │
+│ • Tasks       │    │ • 5-min TTL  │    │ • Web Fetch  │
+│ • Execution   │    │ • Optional   │    │ • Batch      │
 └───────┬───────┘    └──────────────┘    └──────────────┘
         │
         │ Orchestrates
@@ -64,23 +64,15 @@ User: "Create a goal to add OAuth to our API"
 ┌─────────────────────────────────────────────┐
 │      Goal Agent Server (MCP Server)         │
 │  1. Validates request                       │
-│  2. Creates GOAL-0001                       │
-│  3. Returns with cache metadata             │
-└─────────────┬───────────────────────────────┘
-              │ Response with _cache_status
-              ▼
-┌─────────────────────────────────────────────┐
-│         Claude Desktop (MCP Client)         │
-│  1. Sees cache metadata                     │
-│  2. Auto-routes to memory-cache server      │
-└─────────────┬───────────────────────────────┘
-              │ cache_set() via stdio
-              ▼
-┌─────────────────────────────────────────────┐
-│    Memory Cache Server (MCP Server)         │
-│  1. Stores in Redis (TTL: 7 days)           │
-│  2. Returns success                         │
+│  2. Creates GOAL-0001 in PostgreSQL         │
+│  3. Caches to Redis (5-min TTL, optional)   │
+│  4. Returns with persistence metadata       │
 └─────────────────────────────────────────────┘
+
+Architecture Notes:
+• PostgreSQL: Durable storage (all goals/tasks)
+• Redis: Optional caching layer (5-minute TTL)
+• System works without Redis (slightly slower)
 ```
 
 ## 🚀 Quick Start
@@ -90,10 +82,13 @@ User: "Create a goal to add OAuth to our API"
 ```bash
 # Required
 Python 3.10+
-Redis 5.0+
+PostgreSQL 12+ (for Goal Agent persistence)
 Claude Desktop
 
-# Optional
+# Optional but Recommended
+Redis 5.0+ (for caching - improves performance)
+
+# Optional Integrations
 GitHub account + token
 Jira Cloud instance + API token
 Google Cloud project + API keys
@@ -114,7 +109,23 @@ pip install -e .  # Installs mcpctl CLI + all dependencies
 cp .env.example .env
 # Edit .env - see CONFIGURATION.md for details
 
-# 4. Start Redis (required for caching)
+# 4. Setup PostgreSQL (required for Goal Agent)
+# macOS
+brew install postgresql@15
+brew services start postgresql@15
+createdb mcp_goals
+
+# Linux
+sudo apt install postgresql
+sudo systemctl start postgresql
+sudo -u postgres createdb mcp_goals
+
+# Initialize database tables
+python scripts/init_database.py
+
+# See SETUP_POSTGRES.md for detailed setup instructions
+
+# 5. Start Redis (optional - for caching performance)
 # macOS
 brew services start redis
 
@@ -124,10 +135,41 @@ sudo systemctl start redis
 # Docker
 docker run -d -p 6379:6379 redis:alpine
 
-# 5. Validate configuration using mcpctl
+# 6. Validate configuration using mcpctl
 mcpctl start       # Check configuration
 mcpctl test        # Run integration tests
 mcpctl config      # View detailed config
+```
+
+### 🎉 Single Command Start (New!)
+
+**Start everything with one command:**
+
+```bash
+# Start all MCP servers + dashboard in one go
+mcpctl run
+```
+
+This will:
+
+1. ✅ Run pre-flight checks (Redis, server files, environment)
+2. 🚀 Start all 6 MCP servers in background
+3. 📊 Launch the web dashboard at http://localhost:8000
+4. 🔍 Monitor everything in real-time
+
+**Options:**
+
+```bash
+mcpctl run                    # Start servers + dashboard (default)
+mcpctl run --dashboard-only   # Only start the dashboard
+mcpctl run --servers-only     # Only start servers (no dashboard)
+
+# Stop everything
+mcpctl stop                   # Stop all running servers
+
+# View status
+mcpctl status                 # Check which servers are running
+mcpctl logs github            # View logs from specific server
 ```
 
 ### Claude Desktop Configuration

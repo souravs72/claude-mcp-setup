@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Goal-Based AI Agent MCP Server
-Manages goals, tasks, and execution plans with automatic Redis cache persistence
-Goals and plans are automatically cached so LLM sessions remember them instantly
+Manages goals, tasks, and execution plans with PostgreSQL persistence and Redis caching
+Goals and plans are stored in PostgreSQL for durability, with Redis for temporary caching
 """
 
 import json
@@ -29,10 +29,12 @@ from servers.logging_config import (
 from servers.config import (
     load_env_file,
     GoalAgentConfig,
+    PostgresConfig,
     validate_config,
     ConfigurationError,
 )
 from servers.base_client import handle_errors
+from servers.database import DatabaseManager
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -100,12 +102,12 @@ def with_lock(func: Callable[..., Any]) -> Callable[..., Any]:
 
 class CacheLayer:
     """
-    Redis-based cache layer for goal agent persistence.
-    Automatically persists goals and tasks to Redis for cross-session memory.
+    Redis-based cache layer for temporary caching (NOT persistence).
+    Used only for frequently accessed data to reduce database load.
     """
 
     def __init__(self, enabled: bool = True) -> None:
-        self.cache_prefix = "goal_agent"
+        self.cache_prefix = "goal_agent_cache"
         self.enabled = enabled
         self.redis_client: Any = None
 
@@ -129,7 +131,7 @@ class CacheLayer:
                 # Test connection
                 self.redis_client.ping()
                 logger.info(
-                    f"Redis cache connected - {redis_config.host}:{redis_config.port}"
+                    f"Redis cache connected (caching only) - {redis_config.host}:{redis_config.port}"
                 )
 
             except ImportError:
@@ -147,14 +149,14 @@ class CacheLayer:
         """Generate cache key."""
         return f"{self.cache_prefix}:{key_type}:{identifier}"
 
-    def cache_set(self, key: str, value: dict[str, Any], ttl: int = 604800) -> bool:
+    def cache_set(self, key: str, value: dict[str, Any], ttl: int = 3600) -> bool:
         """
-        Set a value in Redis cache.
+        Set a value in Redis cache (temporary).
 
         Args:
             key: Cache key
             value: Dictionary to cache
-            ttl: Time to live in seconds (default: 7 days)
+            ttl: Time to live in seconds (default: 1 hour for temporary caching)
         """
         if not self.enabled or not self.redis_client:
             logger.debug("Cache disabled, skipping set")
@@ -214,26 +216,6 @@ class CacheLayer:
             logger.error(f"Cache delete error: {e}")
             return False
 
-    def cache_keys(self, pattern: str) -> list[str]:
-        """
-        Get all keys matching a pattern.
-
-        Args:
-            pattern: Key pattern with wildcards
-
-        Returns:
-            List of matching keys
-        """
-        if not self.enabled or not self.redis_client:
-            return []
-
-        try:
-            keys = self.redis_client.keys(pattern)
-            return [k.decode() if isinstance(k, bytes) else k for k in keys]
-        except Exception as e:
-            logger.error(f"Cache keys error: {e}")
-            return []
-
     def is_available(self) -> bool:
         """Check if cache is available."""
         if not self.enabled or not self.redis_client:
@@ -246,12 +228,11 @@ class CacheLayer:
 
 
 class GoalAgent:
-    """Manages goals and tasks with automatic Redis cache persistence."""
+    """Manages goals and tasks with PostgreSQL persistence and Redis caching."""
 
-    def __init__(self, config: GoalAgentConfig) -> None:
+    def __init__(self, config: GoalAgentConfig, db_manager: DatabaseManager) -> None:
         self.config = config
-        self.goals: dict[str, Goal] = {}
-        self.tasks: dict[str, Task] = {}
+        self.db = db_manager
         self.goal_counter = 0
         self.task_counter = 0
         self.max_workers = config.max_workers
@@ -269,11 +250,11 @@ class GoalAgent:
 
         logger.info(
             f"Goal agent initialized - Workers: {self.max_workers}, "
-            f"Cache: {config.cache_enabled}"
+            f"Cache: {config.cache_enabled}, Persistence: PostgreSQL"
         )
 
-        # Load state from cache on initialization
-        self._load_from_cache()
+        # Initialize counters from database
+        self._initialize_counters()
 
     @property
     def executor(self) -> ThreadPoolExecutor:
@@ -282,112 +263,50 @@ class GoalAgent:
             raise RuntimeError("Executor not initialized")
         return self._executor
 
-    def _load_from_files(self) -> bool:
-        """Load goals and tasks from JSON files."""
-        goals_file = project_root / "data" / "goals" / "goals.json"
-        tasks_file = project_root / "data" / "goals" / "tasks.json"
-        counters_file = project_root / "data" / "goals" / "counters.json"
-
-        loaded_any = False
-
+    def _initialize_counters(self) -> None:
+        """Initialize goal and task counters from database."""
         try:
-            # Load goals
-            if goals_file.exists():
-                with open(goals_file, "r") as f:
-                    goals_data = json.load(f)
-                    for goal_id, goal_dict in goals_data.items():
-                        self.goals[goal_id] = Goal(**goal_dict)
-                    logger.info(f"Loaded {len(goals_data)} goals from file")
-                    loaded_any = True
+            # Extract highest counter values from existing IDs
+            goals = self.db.list_goals()
+            tasks = self.db.list_tasks()
 
-            # Load tasks
-            if tasks_file.exists():
-                with open(tasks_file, "r") as f:
-                    tasks_data = json.load(f)
-                    for task_id, task_dict in tasks_data.items():
-                        self.tasks[task_id] = Task(**task_dict)
-                    logger.info(f"Loaded {len(tasks_data)} tasks from file")
-                    loaded_any = True
+            if goals:
+                goal_numbers = [int(g.id.split("-")[1]) for g in goals if "-" in g.id]
+                self.goal_counter = max(goal_numbers) if goal_numbers else 0
 
-            # Load counters
-            if counters_file.exists():
-                with open(counters_file, "r") as f:
-                    counters = json.load(f)
-                    self.goal_counter = counters.get("goal", 0)
-                    self.task_counter = counters.get("task", 0)
-                    logger.info(
-                        f"Loaded counters: goal={self.goal_counter}, task={self.task_counter}"
-                    )
+            if tasks:
+                task_numbers = [int(t.id.split("-")[1]) for t in tasks if "-" in t.id]
+                self.task_counter = max(task_numbers) if task_numbers else 0
 
-            return loaded_any
-
+            logger.info(
+                f"Initialized counters from database: goal={self.goal_counter}, task={self.task_counter}"
+            )
         except Exception as e:
-            logger.error(f"Failed to load from files: {e}")
-            return False
+            logger.error(f"Failed to initialize counters: {e}")
+            self.goal_counter = 0
+            self.task_counter = 0
 
-    def _load_from_cache(self) -> None:
-        """Load goals and tasks from cache on startup."""
-        # First try to load from files
-        loaded_from_files = self._load_from_files()
-
-        if loaded_from_files:
-            logger.info("Loaded state from files, syncing to cache...")
-            # Save to cache so Redis is updated
-            self._save_full_state()
-            return
-
-        # If no files, try cache
-        if not self.cache.is_available():
-            logger.info("Cache not available and no files found, starting fresh")
-            return
-
-        try:
-            cache_key = self.cache.get_cache_key("state", "full")
-            state = self.cache.cache_get(cache_key)
-
-            if state:
-                logger.info("Found cached state, restoring...")
-                self.restore_from_cache(state)
-            else:
-                logger.info("No cached state or files found, starting fresh")
-        except Exception as e:
-            logger.error(f"Failed to load from cache: {e}")
-
-    def _persist_to_cache(
-        self, entity_type: str, entity_id: str, data: dict[str, Any]
-    ) -> None:
-        """
-        Persist an entity to cache.
-
-        Args:
-            entity_type: 'goal' or 'task'
-            entity_id: ID of the entity
-            data: Data to cache
-        """
+    def _cache_goal(self, goal_dict: dict[str, Any]) -> None:
+        """Cache a goal temporarily (1 hour)."""
         if not self.cache.is_available():
             return
 
         try:
-            cache_key = self.cache.get_cache_key(entity_type, entity_id)
-            self.cache.cache_set(cache_key, data, ttl=604800)  # 7 days
-
-            # Also update full state
-            self._save_full_state()
+            cache_key = self.cache.get_cache_key("goal", goal_dict["id"])
+            self.cache.cache_set(cache_key, goal_dict, ttl=3600)  # 1 hour
         except Exception as e:
-            logger.error(f"Failed to persist {entity_type} {entity_id}: {e}")
+            logger.debug(f"Failed to cache goal {goal_dict.get('id', 'unknown')}: {e}")
 
-    def _save_full_state(self) -> None:
-        """Save complete state to cache."""
+    def _cache_task(self, task_dict: dict[str, Any]) -> None:
+        """Cache a task temporarily (1 hour)."""
         if not self.cache.is_available():
             return
 
         try:
-            state = self.get_cache_state()
-            cache_key = self.cache.get_cache_key("state", "full")
-            self.cache.cache_set(cache_key, state, ttl=2592000)  # 30 days
-            logger.debug("Full state persisted to cache")
+            cache_key = self.cache.get_cache_key("task", task_dict["id"])
+            self.cache.cache_set(cache_key, task_dict, ttl=3600)  # 1 hour
         except Exception as e:
-            logger.error(f"Failed to save full state: {e}")
+            logger.debug(f"Failed to cache task {task_dict.get('id', 'unknown')}: {e}")
 
     @with_lock
     def create_goal(
@@ -396,8 +315,8 @@ class GoalAgent:
         priority: str = "medium",
         repos: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Goal:
-        """Create a new goal and cache it."""
+    ) -> dict[str, Any]:
+        """Create a new goal and persist to database."""
         if not description or not description.strip():
             raise ValueError("Goal description cannot be empty")
 
@@ -407,33 +326,33 @@ class GoalAgent:
         self.goal_counter += 1
         goal_id = f"GOAL-{self.goal_counter:04d}"
 
-        goal = Goal(
-            id=goal_id,
+        # Create in database
+        goal = self.db.create_goal(
+            goal_id=goal_id,
             description=description.strip(),
             priority=priority,
-            status="planned",
             repos=repos or [],
             metadata=metadata or {},
         )
 
-        self.goals[goal_id] = goal
         logger.info(f"Created goal: {goal_id} - {description[:50]}")
 
-        # Persist to cache
-        self._persist_to_cache("goal", goal_id, goal.to_dict())
+        # Cache temporarily (goal is already a dict from db)
+        self._cache_goal(goal)
 
         return goal
 
     @with_lock
-    def break_down_goal(self, goal_id: str, subtasks: list[dict[str, Any]]) -> Goal:
-        """Break down a goal into executable subtasks and cache."""
-        if goal_id not in self.goals:
+    def break_down_goal(
+        self, goal_id: str, subtasks: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Break down a goal into executable subtasks and persist to database."""
+        goal = self.db.get_goal(goal_id)
+        if not goal:
             raise ValueError(f"Goal {goal_id} not found")
 
         if not subtasks:
             raise ValueError("At least one subtask must be provided")
-
-        goal = self.goals[goal_id]
 
         for subtask_def in subtasks:
             if not subtask_def.get("description"):
@@ -446,12 +365,12 @@ class GoalAgent:
             if priority not in ["high", "medium", "low"]:
                 priority = "medium"
 
-            task = Task(
-                id=task_id,
+            # Create task in database
+            task = self.db.create_task(
+                task_id=task_id,
                 goal_id=goal_id,
                 description=subtask_def.get("description", "").strip(),
-                type=subtask_def.get("type", "general"),
-                status="pending",
+                task_type=subtask_def.get("type", "general"),
                 priority=priority,
                 dependencies=subtask_def.get("dependencies", []),
                 repo=subtask_def.get("repo"),
@@ -461,46 +380,65 @@ class GoalAgent:
             )
 
             # Validate dependencies
-            for dep_id in task.dependencies:
-                if dep_id not in self.tasks:
+            for dep_id in task.get("dependencies", []):
+                if not self.db.get_task(dep_id):
                     logger.warning(f"Dependency {dep_id} not found for task {task_id}")
 
-            self.tasks[task_id] = task
-            goal.tasks.append(task_id)
-
-            # Persist task to cache
-            self._persist_to_cache("task", task_id, task.to_dict())
+            # Cache task (already a dict from db)
+            self._cache_task(task)
 
             logger.debug(f"Created task: {task_id} for goal {goal_id}")
 
-        goal.updated_at = datetime.now().isoformat()
-        goal.status = "in_progress"
-
-        # Persist updated goal to cache
-        self._persist_to_cache("goal", goal_id, goal.to_dict())
+        # Update goal status
+        updated_goal = self.db.update_goal(goal_id, status="in_progress")
+        if updated_goal:
+            goal_dict = updated_goal.to_dict()
+            self._cache_goal(goal_dict)
 
         logger.info(f"Goal {goal_id} broken down into {len(subtasks)} tasks")
-        return goal
+
+        # Refresh goal to get updated data
+        goal = self.db.get_goal(goal_id)
+        return goal.to_dict() if goal else {}
 
     def get_goal(self, goal_id: str) -> dict[str, Any]:
-        """Get goal with all task details."""
+        """Get goal with all task details (cache-first strategy)."""
         with self.lock:
-            if goal_id not in self.goals:
+            # Try cache first
+            if self.cache.is_available():
+                cache_key = self.cache.get_cache_key("goal", goal_id)
+                cached = self.cache.cache_get(cache_key)
+                if cached:
+                    cached["_cache_status"] = {
+                        "enabled": True,
+                        "persistence": "PostgreSQL",
+                        "served_from": "Redis Cache",
+                        "cache_hit": True,
+                    }
+                    logger.debug(f"Cache HIT for goal {goal_id}")
+                    return cached
+
+            # Cache miss - query database
+            logger.debug(f"Cache MISS for goal {goal_id}, querying PostgreSQL")
+            goal = self.db.get_goal(goal_id)
+            if not goal:
                 raise ValueError(f"Goal {goal_id} not found")
 
-            goal = self.goals[goal_id]
             result = goal.to_dict()
 
-            result["task_details"] = [
-                self.tasks[task_id].to_dict()
-                for task_id in goal.tasks
-                if task_id in self.tasks
-            ]
+            # Get all tasks for this goal
+            tasks = self.db.list_tasks(goal_id=goal_id)
+            result["task_details"] = [task.to_dict() for task in tasks]
+
+            # Cache for next time
+            self._cache_goal(result)
 
             # Add cache info
             result["_cache_status"] = {
                 "enabled": self.cache.is_available(),
-                "key": self.cache.get_cache_key("goal", goal_id),
+                "persistence": "PostgreSQL",
+                "served_from": "PostgreSQL",
+                "cache_hit": False,
             }
 
             return result
@@ -508,80 +446,82 @@ class GoalAgent:
     def list_goals(
         self, status: str | None = None, priority: str | None = None
     ) -> list[dict[str, Any]]:
-        """List all goals with optional filters."""
+        """List all goals with optional filters from database."""
         with self.lock:
-            goals = [goal.to_dict() for goal in self.goals.values()]
-
-        if status:
-            if status not in ["planned", "in_progress", "completed", "cancelled"]:
+            if status and status not in [
+                "planned",
+                "in_progress",
+                "completed",
+                "cancelled",
+            ]:
                 logger.warning(f"Invalid status filter: {status}")
-            else:
-                goals = [g for g in goals if g["status"] == status]
+                status = None
 
-        if priority:
-            if priority not in ["high", "medium", "low"]:
+            if priority and priority not in ["high", "medium", "low"]:
                 logger.warning(f"Invalid priority filter: {priority}")
-            else:
-                goals = [g for g in goals if g["priority"] == priority]
+                priority = None
 
-        logger.debug(f"Listed {len(goals)} goals")
-        return goals
+            goals = self.db.list_goals(status=status, priority=priority)
+            result = [goal.to_dict() for goal in goals]
+
+            logger.debug(f"Listed {len(result)} goals from database")
+            return result
 
     @with_lock
     def update_task_status(
         self, task_id: str, status: str, result: Any | None = None
-    ) -> Task:
-        """Update task status and result."""
-        if task_id not in self.tasks:
+    ) -> dict[str, Any]:
+        """Update task status and result in database."""
+        task = self.db.get_task(task_id)
+        if not task:
             raise ValueError(f"Task {task_id} not found")
 
         if status not in ["pending", "in_progress", "completed", "failed", "blocked"]:
             raise ValueError(f"Invalid status: {status}")
 
-        task = self.tasks[task_id]
         old_status = task.status
-        task.status = status
 
-        if result:
-            task.result = result
+        # Update in database
+        completed_at = datetime.utcnow() if status == "completed" else None
+        updated_task = self.db.update_task(
+            task_id=task_id,
+            status=status,
+            result=result,
+            completed_at=completed_at,
+        )
 
-        if status == "completed":
-            task.completed_at = datetime.now().isoformat()
+        if not updated_task:
+            raise ValueError(f"Failed to update task {task_id}")
 
         logger.info(f"Task {task_id} status: {old_status} -> {status}")
 
-        # Persist updated task to cache
-        self._persist_to_cache("task", task_id, task.to_dict())
+        # Convert to dict and cache
+        task_dict = updated_task.to_dict()
+        self._cache_task(task_dict)
 
-        # Update goal and persist
-        goal_id = task.goal_id
-        if goal_id in self.goals:
-            goal = self.goals[goal_id]
-            all_tasks = [self.tasks[tid] for tid in goal.tasks if tid in self.tasks]
+        # Check if all tasks in goal are completed
+        goal_id = updated_task.goal_id
+        all_tasks = self.db.list_tasks(goal_id=goal_id)
 
-            if all_tasks and all(t.status == "completed" for t in all_tasks):
-                goal.status = "completed"
-                goal.updated_at = datetime.now().isoformat()
+        if all_tasks and all(t.status == "completed" for t in all_tasks):
+            updated_goal = self.db.update_goal(goal_id, status="completed")
+            if updated_goal:
                 logger.info(f"Goal {goal_id} completed")
+                goal_dict = updated_goal.to_dict()
+                self._cache_goal(goal_dict)
 
-            self._persist_to_cache("goal", goal_id, goal.to_dict())
-
-        return task
+        return task_dict
 
     def get_next_tasks(self, goal_id: str | None = None) -> list[dict[str, Any]]:
-        """Get next executable tasks."""
+        """Get next executable tasks from database."""
         with self.lock:
-            tasks_to_check: list[Task] = []
-
             if goal_id:
-                if goal_id not in self.goals:
+                goal = self.db.get_goal(goal_id)
+                if not goal:
                     raise ValueError(f"Goal {goal_id} not found")
-                task_ids = self.goals[goal_id].tasks
-                tasks_to_check = [
-                    self.tasks[tid] for tid in task_ids if tid in self.tasks
-                ]
+                tasks_to_check = self.db.list_tasks(goal_id=goal_id)
             else:
-                tasks_to_check = list(self.tasks.values())
+                tasks_to_check = self.db.list_tasks()
 
             executable_tasks = []
 
@@ -589,25 +529,17 @@ class GoalAgent:
                 if task.status != "pending":
                     continue
 
+                # Check if all dependencies are completed
                 dependencies_met = all(
-                    self.tasks.get(
-                        dep_id,
-                        Task(
-                            id="",
-                            goal_id="",
-                            description="",
-                            type="",
-                            status="",
-                            priority="",
-                        ),
-                    ).status
-                    == "completed"
+                    (dep_task := self.db.get_task(dep_id))
+                    and dep_task.status == "completed"
                     for dep_id in task.dependencies
                 )
 
                 if dependencies_met:
                     executable_tasks.append(task.to_dict())
 
+            # Sort by priority
             priority_order = {"high": 0, "medium": 1, "low": 2}
             executable_tasks.sort(key=lambda t: priority_order.get(t["priority"], 1))
 
@@ -615,26 +547,49 @@ class GoalAgent:
             return executable_tasks
 
     def get_task(self, task_id: str) -> dict[str, Any]:
-        """Get task details."""
+        """Get task details (cache-first strategy)."""
         with self.lock:
-            if task_id not in self.tasks:
+            # Try cache first
+            if self.cache.is_available():
+                cache_key = self.cache.get_cache_key("task", task_id)
+                cached = self.cache.cache_get(cache_key)
+                if cached:
+                    cached["_cache_status"] = {
+                        "enabled": True,
+                        "persistence": "PostgreSQL",
+                        "served_from": "Redis Cache",
+                        "cache_hit": True,
+                    }
+                    logger.debug(f"Cache HIT for task {task_id}")
+                    return cached
+
+            # Cache miss - query database
+            logger.debug(f"Cache MISS for task {task_id}, querying PostgreSQL")
+            task = self.db.get_task(task_id)
+            if not task:
                 raise ValueError(f"Task {task_id} not found")
 
-            task = self.tasks[task_id].to_dict()
-            task["_cache_status"] = {
+            result = task.to_dict()
+
+            # Cache for next time
+            self._cache_task(result)
+
+            result["_cache_status"] = {
                 "enabled": self.cache.is_available(),
-                "key": self.cache.get_cache_key("task", task_id),
+                "persistence": "PostgreSQL",
+                "served_from": "PostgreSQL",
+                "cache_hit": False,
             }
-            return task
+            return result
 
     def generate_execution_plan(self, goal_id: str) -> dict[str, Any]:
-        """Generate phased execution plan."""
+        """Generate phased execution plan from database."""
         with self.lock:
-            if goal_id not in self.goals:
+            goal = self.db.get_goal(goal_id)
+            if not goal:
                 raise ValueError(f"Goal {goal_id} not found")
 
-            goal = self.goals[goal_id]
-            tasks = [self.tasks[tid] for tid in goal.tasks if tid in self.tasks]
+            tasks = self.db.list_tasks(goal_id=goal_id)
 
             if not tasks:
                 return {
@@ -732,7 +687,7 @@ class GoalAgent:
             try:
                 updated_task = future.result()
                 results["successful"].append(
-                    {"task_id": task_id, "status": updated_task.status}
+                    {"task_id": task_id, "status": updated_task["status"]}
                 )
             except Exception as e:
                 results["failed"].append({"task_id": task_id, "error": str(e)})
@@ -744,7 +699,7 @@ class GoalAgent:
         return results
 
     def batch_get_tasks(self, task_ids: list[str]) -> dict[str, Any]:
-        """Retrieve multiple tasks concurrently."""
+        """Retrieve multiple tasks concurrently from database."""
         logger.info(f"Batch retrieving {len(task_ids)} tasks")
 
         futures: dict[Any, str] = {}
@@ -767,29 +722,22 @@ class GoalAgent:
 
     @with_lock
     def delete_task(self, task_id: str) -> dict[str, Any]:
-        """Delete a task."""
-        if task_id not in self.tasks:
+        """Delete a task from database."""
+        task = self.db.get_task(task_id)
+        if not task:
             raise ValueError(f"Task {task_id} not found")
 
-        task = self.tasks[task_id]
         goal_id = task.goal_id
 
         # Check if other tasks depend on this one
-        dependent_tasks = [
-            t.id for t in self.tasks.values() if task_id in t.dependencies
-        ]
+        all_tasks = self.db.list_tasks()
+        dependent_tasks = [t.id for t in all_tasks if task_id in t.dependencies]
 
         if dependent_tasks:
             logger.warning(f"Task {task_id} has dependent tasks: {dependent_tasks}")
 
-        del self.tasks[task_id]
-
-        if goal_id in self.goals:
-            goal = self.goals[goal_id]
-            if task_id in goal.tasks:
-                goal.tasks.remove(task_id)
-                goal.updated_at = datetime.now().isoformat()
-                self._persist_to_cache("goal", goal_id, goal.to_dict())
+        # Delete from database (this will also update the goal's tasks relationship)
+        self.db.delete_task(task_id)
 
         # Delete from cache
         cache_key = self.cache.get_cache_key("task", task_id)
@@ -805,31 +753,27 @@ class GoalAgent:
 
     @with_lock
     def delete_goal(self, goal_id: str) -> dict[str, Any]:
-        """Delete a goal and all tasks."""
-        if goal_id not in self.goals:
+        """Delete a goal and all tasks from database."""
+        goal = self.db.get_goal(goal_id)
+        if not goal:
             raise ValueError(f"Goal {goal_id} not found")
 
-        goal = self.goals[goal_id]
-        task_ids = goal.tasks.copy()
+        # Get task IDs before deletion
+        tasks = self.db.list_tasks(goal_id=goal_id)
+        task_ids = [t.id for t in tasks]
 
-        # Delete all tasks
-        for task_id in task_ids:
-            if task_id in self.tasks:
-                del self.tasks[task_id]
-                # Delete task from cache
-                task_cache_key = self.cache.get_cache_key("task", task_id)
-                self.cache.cache_delete([task_cache_key])
+        # Delete from database (cascading will delete tasks automatically)
+        self.db.delete_goal(goal_id)
 
-        del self.goals[goal_id]
-
-        # Delete goal from cache
+        # Delete from cache
         goal_cache_key = self.cache.get_cache_key("goal", goal_id)
         self.cache.cache_delete([goal_cache_key])
 
-        # Update full state
-        self._save_full_state()
+        for task_id in task_ids:
+            task_cache_key = self.cache.get_cache_key("task", task_id)
+            self.cache.cache_delete([task_cache_key])
 
-        logger.info(f"Deleted goal {goal_id} and {len(task_ids)} tasks")
+        logger.info(f"Deleted goal {goal_id} and {len(task_ids)} tasks from database")
 
         return {
             "deleted_goal_id": goal_id,
@@ -847,84 +791,59 @@ class GoalAgent:
         status: str | None = None,
         repos: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Goal:
-        """Update an existing goal."""
-        if goal_id not in self.goals:
+    ) -> dict[str, Any]:
+        """Update an existing goal in database."""
+        goal = self.db.get_goal(goal_id)
+        if not goal:
             raise ValueError(f"Goal {goal_id} not found")
-
-        goal = self.goals[goal_id]
 
         if description:
             if not description.strip():
                 raise ValueError("Description cannot be empty")
-            goal.description = description.strip()
 
         if priority:
             if priority not in ["high", "medium", "low"]:
                 raise ValueError("Priority must be 'high', 'medium', or 'low'")
-            goal.priority = priority
 
         if status:
             if status not in ["planned", "in_progress", "completed", "cancelled"]:
                 raise ValueError(f"Invalid status: {status}")
-            goal.status = status
 
-        if repos is not None:
-            goal.repos = repos
+        # Update in database
+        updated_goal = self.db.update_goal(
+            goal_id=goal_id,
+            description=description,
+            priority=priority,
+            status=status,
+            repos=repos,
+            metadata=metadata,
+        )
 
-        if metadata:
-            goal.metadata.update(metadata)
+        if not updated_goal:
+            raise ValueError(f"Failed to update goal {goal_id}")
 
-        goal.updated_at = datetime.now().isoformat()
-
-        # Persist to cache
-        self._persist_to_cache("goal", goal_id, goal.to_dict())
+        # Convert to dict and cache
+        goal_dict = updated_goal.to_dict()
+        self._cache_goal(goal_dict)
 
         logger.info(f"Updated goal: {goal_id}")
-        return goal
+        return goal_dict
 
-    def get_cache_state(self) -> dict[str, Any]:
-        """Get current state for caching."""
+    def get_stats(self) -> dict[str, Any]:
+        """Get current statistics from database."""
         with self.lock:
             return {
-                "goals": {gid: goal.to_dict() for gid, goal in self.goals.items()},
-                "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
+                "goals": self.db.get_goal_count(),
+                "tasks": self.db.get_task_count(),
                 "goal_counter": self.goal_counter,
                 "task_counter": self.task_counter,
+                "cache_enabled": self.cache.is_available(),
+                "persistence": "PostgreSQL",
                 "timestamp": datetime.now().isoformat(),
             }
 
-    def restore_from_cache(self, state: dict[str, Any]) -> bool:
-        """Restore state from cache."""
-        try:
-            with self.lock:
-                # Restore goals
-                self.goals = {
-                    gid: Goal(**goal_data)
-                    for gid, goal_data in state.get("goals", {}).items()
-                }
-
-                # Restore tasks
-                self.tasks = {
-                    tid: Task(**task_data)
-                    for tid, task_data in state.get("tasks", {}).items()
-                }
-
-                # Restore counters
-                self.goal_counter = state.get("goal_counter", 0)
-                self.task_counter = state.get("task_counter", 0)
-
-                logger.info(
-                    f"Restored {len(self.goals)} goals and {len(self.tasks)} tasks from cache"
-                )
-                return True
-
-        except Exception as e:
-            logger.error(f"Failed to restore from cache: {e}", exc_info=True)
-            return False
-
     def shutdown(self) -> None:
-        """Shutdown the executor gracefully."""
+        """Shutdown the executor and database connection gracefully."""
         logger.info("Shutting down Goal Agent...")
 
         if self._executor:
@@ -935,26 +854,50 @@ class GoalAgent:
             except Exception as e:
                 logger.error(f"Error during executor shutdown: {e}")
 
+        # Close database connection
+        try:
+            self.db.close()
+            logger.info("Database connection closed")
+        except Exception as e:
+            logger.error(f"Error closing database: {e}")
+
         logger.info("Goal Agent shutdown complete")
 
 
-# Initialize agent
+# Initialize database and agent
 try:
     config = GoalAgentConfig()
     validate_config(config, logger)
+
+    # Initialize PostgreSQL database
+    postgres_config = PostgresConfig()
+    validate_config(postgres_config, logger)
+
+    database_url = postgres_config.get_connection_string()
+    db_manager = DatabaseManager(
+        database_url=database_url,
+        pool_size=postgres_config.pool_size,
+        max_overflow=postgres_config.max_overflow,
+    )
+
+    # Create tables if they don't exist
+    db_manager.create_tables()
+    logger.info("Database tables initialized")
 
     log_server_startup(
         logger,
         "Goal Agent Server",
         {
-            "Version": "2.3 (Fixed Cache)",
+            "Version": "3.0 (PostgreSQL Persistence)",
             "Thread Pool Workers": config.max_workers,
             "Cache Enabled": config.cache_enabled,
             "Timeout": config.timeout,
+            "Database": f"{postgres_config.host}:{postgres_config.port}/{postgres_config.database}",
+            "Persistence": "PostgreSQL",
         },
     )
 
-    agent = GoalAgent(config)
+    agent = GoalAgent(config, db_manager)
 
 except ConfigurationError as e:
     logger.critical(f"Configuration error: {e}")
@@ -975,7 +918,7 @@ def create_goal(
 ) -> str:
     """
     Create a new goal for the AI agent to work on.
-    Goal will be automatically cached to Redis for persistence across Claude sessions.
+    Goal is persisted to PostgreSQL database for durability.
 
     Args:
         description: Clear description of the goal (required, non-empty)
@@ -989,14 +932,12 @@ def create_goal(
     repos_list = json.loads(repos) if repos else []
     metadata_dict = json.loads(metadata) if metadata else {}
 
-    goal = agent.create_goal(description, priority, repos_list, metadata_dict)
-    result = goal.to_dict()
+    result = agent.create_goal(description, priority, repos_list, metadata_dict)
 
-    result["_cache_status"] = {
-        "persisted": agent.cache.is_available(),
-        "message": "Goal automatically saved to Redis"
-        if agent.cache.is_available()
-        else "Cache disabled",
+    result["_persistence"] = {
+        "database": "PostgreSQL",
+        "cache_enabled": agent.cache.is_available(),
+        "message": "Goal saved to PostgreSQL database",
     }
 
     return json.dumps(result, indent=2)
@@ -1007,14 +948,12 @@ def create_goal(
 def break_down_goal(goal_id: str, subtasks: str) -> str:
     """Break down a goal into executable subtasks with validation."""
     subtasks_list = json.loads(subtasks)
-    goal = agent.break_down_goal(goal_id, subtasks_list)
-    result = goal.to_dict()
+    result = agent.break_down_goal(goal_id, subtasks_list)
 
-    result["_cache_status"] = {
-        "persisted": agent.cache.is_available(),
-        "message": "Tasks automatically saved to Redis"
-        if agent.cache.is_available()
-        else "Cache disabled",
+    result["_persistence"] = {
+        "database": "PostgreSQL",
+        "cache_enabled": agent.cache.is_available(),
+        "message": "Tasks saved to PostgreSQL database",
     }
 
     return json.dumps(result, indent=2)
@@ -1036,6 +975,7 @@ def list_goals(status: str | None = None, priority: str | None = None) -> str:
     result = {
         "goals": goals,
         "count": len(goals),
+        "persistence": "PostgreSQL",
         "cache_enabled": agent.cache.is_available(),
     }
     return json.dumps(result, indent=2)
@@ -1054,14 +994,12 @@ def get_next_tasks(goal_id: str | None = None) -> str:
 def update_task_status(task_id: str, status: str, result: str | None = None) -> str:
     """Update the status of a task with validation."""
     result_dict = json.loads(result) if result else None
-    task = agent.update_task_status(task_id, status, result_dict)
-    task_result = task.to_dict()
+    task_result = agent.update_task_status(task_id, status, result_dict)
 
-    task_result["_cache_status"] = {
-        "persisted": agent.cache.is_available(),
-        "message": "Task status saved to Redis"
-        if agent.cache.is_available()
-        else "Cache disabled",
+    task_result["_persistence"] = {
+        "database": "PostgreSQL",
+        "cache_enabled": agent.cache.is_available(),
+        "message": "Task status saved to PostgreSQL database",
     }
 
     return json.dumps(task_result, indent=2)
@@ -1113,16 +1051,14 @@ def update_goal(
     repos_list = json.loads(repos) if repos else None
     metadata_dict = json.loads(metadata) if metadata else None
 
-    goal = agent.update_goal(
+    result = agent.update_goal(
         goal_id, description, priority, status, repos_list, metadata_dict
     )
-    result = goal.to_dict()
 
-    result["_cache_status"] = {
-        "persisted": agent.cache.is_available(),
-        "message": "Goal updated in Redis"
-        if agent.cache.is_available()
-        else "Cache disabled",
+    result["_persistence"] = {
+        "database": "PostgreSQL",
+        "cache_enabled": agent.cache.is_available(),
+        "message": "Goal updated in PostgreSQL database",
     }
 
     return json.dumps(result, indent=2)
@@ -1148,79 +1084,31 @@ def batch_get_tasks(task_ids: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def save_state_to_cache() -> str:
-    """Manually save all goals and tasks to cache."""
-    if not agent.cache.is_available():
-        return json.dumps({"success": False, "error": "Cache not available"})
-
-    agent._save_full_state()
-    state = agent.get_cache_state()
+def get_agent_status() -> str:
+    """Get current goal agent status and statistics."""
+    stats = agent.get_stats()
 
     result = {
-        "success": True,
-        "state_snapshot": {
-            "goals_count": len(state["goals"]),
-            "tasks_count": len(state["tasks"]),
-            "timestamp": state["timestamp"],
-        },
-        "message": "Full state saved to Redis cache",
-    }
-
-    return json.dumps(result, indent=2)
-
-
-@mcp.tool()
-@handle_errors(logger)
-def restore_state_from_cache(state_json: str) -> str:
-    """Restore all goals and tasks from cached state."""
-    try:
-        state = json.loads(state_json)
-        success = agent.restore_from_cache(state)
-
-        result = {
-            "success": success,
-            "restored": {"goals": len(agent.goals), "tasks": len(agent.tasks)},
-            "message": "State restored successfully"
-            if success
-            else "Failed to restore state",
-        }
-
-        return json.dumps(result, indent=2)
-
-    except Exception as e:
-        logger.error(f"Restore failed: {e}")
-        return json.dumps({"success": False, "error": str(e)})
-
-
-@mcp.tool()
-@handle_errors(logger)
-def get_cache_status() -> str:
-    """Get current cache integration status."""
-    state = agent.get_cache_state()
-
-    result = {
-        "cache_integration": {
-            "enabled": agent.cache.enabled,
-            "available": agent.cache.is_available(),
-            "backend": "Redis",
-            "description": "Direct Redis integration for automatic persistence",
+        "persistence": {
+            "database": "PostgreSQL",
+            "cache": "Redis (temporary, 5-minute TTL)",
+            "description": "Data stored in PostgreSQL for durability, Redis for performance",
         },
         "current_state": {
-            "goals": len(state["goals"]),
-            "tasks": len(state["tasks"]),
-            "goal_counter": state["goal_counter"],
-            "task_counter": state["task_counter"],
+            "goals": stats["goals"],
+            "tasks": stats["tasks"],
+            "goal_counter": stats["goal_counter"],
+            "task_counter": stats["task_counter"],
         },
         "agent_config": {
             "max_workers": agent.config.max_workers,
             "timeout": agent.config.timeout,
             "cache_enabled": agent.config.cache_enabled,
         },
-        "usage_guide": {
-            "automatic": "All goals and tasks are automatically persisted to Redis",
-            "manual_save": "Use save_state_to_cache() for explicit full state backup",
-            "manual_restore": "Use restore_state_from_cache() with state JSON to restore",
-            "persistence": "State persists across Claude sessions and restarts",
+        "architecture": {
+            "persistence": "PostgreSQL - Real persistent storage",
+            "caching": "Redis - Temporary caching for performance (5 min TTL)",
+            "note": "All data is permanently stored in PostgreSQL, Redis is optional",
         },
     }
 

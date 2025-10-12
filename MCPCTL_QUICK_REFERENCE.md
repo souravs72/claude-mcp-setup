@@ -8,6 +8,15 @@ pip install -e .
 
 ## Common Commands
 
+### 🚀 Quick Start (NEW!)
+
+| Command                       | Description                           |
+| ----------------------------- | ------------------------------------- |
+| `mcpctl run`                  | Start all servers + dashboard (Best!) |
+| `mcpctl run --dashboard-only` | Start dashboard only                  |
+| `mcpctl run --servers-only`   | Start servers only (no dashboard)     |
+| `mcpctl stop`                 | Stop all servers                      |
+
 ### Basic Operations
 
 | Command            | Description                |
@@ -15,7 +24,6 @@ pip install -e .
 | `mcpctl --version` | Show version               |
 | `mcpctl --help`    | Show help                  |
 | `mcpctl start`     | Validate configuration     |
-| `mcpctl stop`      | Stop all servers           |
 | `mcpctl status`    | Check running servers      |
 | `mcpctl config`    | Show configuration         |
 | `mcpctl dashboard` | Start web dashboard (8000) |
@@ -74,10 +82,23 @@ mcpctl test
 mcpctl status
 ```
 
-### Daily Development
+### Daily Development (Easy Way - NEW!)
 
 ```bash
-# Start web dashboard
+# Start everything with one command
+mcpctl run
+
+# Dashboard opens at http://localhost:8000
+# Press CTRL+C to stop dashboard (servers keep running)
+
+# Stop servers when done
+mcpctl stop
+```
+
+### Daily Development (Traditional Way)
+
+```bash
+# Start web dashboard separately
 mcpctl dashboard
 
 # Check what's running

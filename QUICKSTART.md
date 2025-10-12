@@ -33,6 +33,7 @@ mcpctl --version  # Should show: mcpctl version 1.0.0
 Redis is required for the Memory Cache server.
 
 ### macOS (Homebrew)
+
 ```bash
 brew install redis
 brew services start redis
@@ -42,6 +43,7 @@ redis-cli ping  # Should return: PONG
 ```
 
 ### Linux (Ubuntu/Debian)
+
 ```bash
 sudo apt update
 sudo apt install redis-server
@@ -53,6 +55,7 @@ redis-cli ping  # Should return: PONG
 ```
 
 ### Docker (All platforms)
+
 ```bash
 docker run -d -p 6379:6379 --name redis redis:alpine
 
@@ -61,6 +64,7 @@ docker exec redis redis-cli ping  # Should return: PONG
 ```
 
 ### Windows
+
 ```bash
 # Download from: https://github.com/microsoftarchive/redis/releases
 # Or use WSL2 with Linux instructions above
@@ -142,31 +146,79 @@ mcpctl test         # Run integration tests
 ```
 
 **Alternative (old method):**
+
 ```bash
 python scripts/start_all_servers.py
 ```
 
 If you see errors, check:
+
 - Redis is running: `redis-cli ping` or `mcpctl config`
 - Python version: `python --version` (need 3.10+)
 - Dependencies installed: `pip list | grep mcp`
 - Run: `mcpctl config` for detailed diagnostics
+
+## 🚀 Step 4.5: Start Everything with One Command! (NEW)
+
+**The easiest way to run all servers and dashboard:**
+
+```bash
+mcpctl run
+```
+
+This single command will:
+
+1. ✅ Run pre-flight checks (Redis, files, environment)
+2. 🚀 Start all 6 MCP servers in background
+3. 📊 Launch web dashboard at http://localhost:8000
+4. 🔍 Monitor everything in real-time
+
+**Quick Commands:**
+
+```bash
+mcpctl run                    # Start servers + dashboard (recommended!)
+mcpctl run --dashboard-only   # Only start the dashboard
+mcpctl run --servers-only     # Only start servers (no dashboard)
+
+# Stop everything when done
+mcpctl stop                   # Stop all running servers
+
+# Check what's running
+mcpctl status                 # View server status
+mcpctl logs github            # View specific server logs
+```
+
+**When to use this:**
+
+- ✅ Development & testing
+- ✅ Local monitoring with dashboard
+- ✅ Quick prototyping
+
+**When NOT to use this:**
+
+- ❌ Production with Claude Desktop (servers auto-start via stdio)
+- ❌ CI/CD pipelines (use individual commands)
+
+> **Note:** This is separate from Claude Desktop integration. For Claude Desktop, continue to Step 5 below. The `mcpctl run` command is perfect for testing and local development with the dashboard.
 
 ## Step 5: Configure Claude Desktop (2 minutes)
 
 ### Find Config File
 
 **macOS:**
+
 ```bash
 open ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
 **Linux:**
+
 ```bash
 nano ~/.config/Claude/claude_desktop_config.json
 ```
 
 **Windows:**
+
 ```bash
 notepad %APPDATA%\Claude\claude_desktop_config.json
 ```
@@ -176,6 +228,7 @@ notepad %APPDATA%\Claude\claude_desktop_config.json
 **IMPORTANT:** Use **absolute paths** (not relative).
 
 Get your project path:
+
 ```bash
 pwd  # Copy this output
 ```
@@ -251,20 +304,23 @@ Replace `/absolute/path/to/your/project` with the output from `pwd`:
 **IMPORTANT:** Full restart required (not just refresh)
 
 1. **Quit Claude Desktop completely**
+
    - macOS: Cmd+Q
    - Windows: File → Exit
    - Linux: Close all windows
 
 2. **Verify it's closed**
+
    ```bash
    # macOS/Linux
    ps aux | grep Claude  # Should show nothing
-   
+
    # Windows (PowerShell)
    Get-Process | Where-Object {$_.Name -like "*Claude*"}
    ```
 
 3. **Restart Claude Desktop**
+
    - Launch from Applications/Start Menu
 
 4. **Wait 10 seconds** for servers to initialize
@@ -299,6 +355,7 @@ Store "hello world" in cache with key "test"
 ```
 
 **Expected Response:**
+
 ```
 ✓ Successfully cached
 Key: test
@@ -312,6 +369,7 @@ Create a goal to test the system
 ```
 
 **Expected Response:**
+
 ```
 ✓ Created GOAL-0001: Test the system
 Status: planned
@@ -325,6 +383,7 @@ Get the goal I just created from cache
 ```
 
 **Expected Response:**
+
 ```
 ✓ Retrieved GOAL-0001 from cache
 Description: Test the system
@@ -338,6 +397,7 @@ List my repositories
 ```
 
 **Expected Response:**
+
 ```
 ✓ Found X repositories
 - repo1 (stars: Y, forks: Z)
@@ -351,6 +411,7 @@ Show my Jira projects
 ```
 
 **Expected Response:**
+
 ```
 ✓ Found X projects
 - PROJ: Project Name
@@ -366,6 +427,7 @@ Create a goal to build a REST API with authentication
 ```
 
 Claude will:
+
 1. Create a goal
 2. Cache it automatically
 3. Be ready to break it down into tasks
@@ -396,6 +458,7 @@ mcpctl logs --all  # All server logs
 **Symptom:** Claude says "I don't have access to..."
 
 **Solutions:**
+
 ```bash
 # 1. Quick check with mcpctl
 mcpctl config      # Verify all paths and env vars
@@ -422,6 +485,7 @@ mcpctl logs goal-agent    # View recent logs
 **Symptom:** "Redis connection refused" or "Cache client not initialized"
 
 **Solutions:**
+
 ```bash
 # 1. Quick check with mcpctl
 mcpctl config      # Shows Redis status
@@ -448,6 +512,7 @@ docker logs redis  # Docker
 **Symptom:** "ModuleNotFoundError: No module named 'mcp'"
 
 **Solutions:**
+
 ```bash
 # 1. Activate virtual environment
 source venv/bin/activate
@@ -469,6 +534,7 @@ python --version  # Must be 3.10+
 **Solutions:**
 
 **GitHub:**
+
 ```bash
 # 1. Verify token format
 echo $GITHUB_PERSONAL_ACCESS_TOKEN
@@ -484,6 +550,7 @@ curl -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
 ```
 
 **Jira:**
+
 ```bash
 # 1. Verify credentials
 echo $JIRA_BASE_URL
@@ -498,6 +565,7 @@ curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
 ### Server Logs Show Errors
 
 **Check logs:**
+
 ```bash
 # View all errors
 grep -i error logs/*.log
@@ -510,6 +578,7 @@ head -20 logs/memory_cache_server.log
 ```
 
 **Common fixes:**
+
 - Configuration errors → Check .env file
 - Port conflicts → Change ports in config
 - Permission errors → Check file permissions
@@ -537,11 +606,13 @@ redis-cli info clients
 Now that everything is working:
 
 1. **Read the full documentation**
+
    - [README.md](README.md) - System architecture
    - [CONFIGURATION.md](CONFIGURATION.md) - Advanced config
    - [README_GOAL_AGENT.md](README_GOAL_AGENT.md) - API reference
 
 2. **Try real examples**
+
    ```
    Create a goal to add OAuth authentication to our API
    Break it down into 7 tasks
@@ -550,6 +621,7 @@ Now that everything is working:
    ```
 
 3. **Explore integrations**
+
    - Set up GitHub for code management
    - Connect Jira for ticket tracking
    - Add Frappe if you use ERPNext
@@ -571,6 +643,12 @@ Now that everything is working:
 ## 📝 Essential mcpctl Commands
 
 ```bash
+# 🚀 NEW: Single Command Start (Recommended!)
+mcpctl run                    # Start all servers + dashboard
+mcpctl run --dashboard-only   # Only dashboard
+mcpctl run --servers-only     # Only servers
+mcpctl stop                   # Stop everything
+
 # Configuration & Validation
 mcpctl config        # Show all configuration
 mcpctl start         # Validate servers
@@ -586,7 +664,7 @@ mcpctl logs memory-cache -n 100 # Last 100 lines
 mcpctl logs --all               # All server logs
 
 # Server Management
-mcpctl stop          # Stop all servers
+mcpctl dashboard     # Start dashboard only
 mcpctl restart github # Restart specific server
 ```
 
@@ -622,6 +700,7 @@ If you're still stuck:
 6. Test Python environment: `python -c "import mcp; print('OK')"`
 
 Most issues are due to:
+
 - Relative paths instead of absolute paths
 - Claude Desktop not fully restarted
 - Redis not running

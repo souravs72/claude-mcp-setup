@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 import redis
 import psutil
@@ -26,7 +27,26 @@ from contextlib import asynccontextmanager
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.config import load_env_file, RedisConfig
+from servers.config import load_env_file, RedisConfig, PostgresConfig
+from servers.database import DatabaseManager
+
+
+# Pydantic models for request validation
+class CreateGoalRequest(BaseModel):
+    description: str
+    priority: str = "medium"
+    repos: list[str] = []
+    metadata: dict = {}
+
+
+class AddTasksRequest(BaseModel):
+    subtasks: list[dict]
+
+
+class UpdateTaskStatusRequest(BaseModel):
+    status: str
+    result: dict | None = None
+
 
 # Initialize paths
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -37,6 +57,28 @@ STATIC_DIR = SERVERS_DIR / "static"
 
 # Load environment
 load_env_file()
+
+# Initialize database manager for goal/task access
+_db_manager: Optional[DatabaseManager] = None
+
+
+def get_db_manager() -> Optional[DatabaseManager]:
+    """Get or create database manager for accessing goals/tasks."""
+    global _db_manager
+    if _db_manager is None:
+        try:
+            postgres_config = PostgresConfig()
+            database_url = postgres_config.get_connection_string()
+            _db_manager = DatabaseManager(
+                database_url=database_url,
+                pool_size=5,  # Smaller pool for dashboard
+                max_overflow=10,
+            )
+        except Exception as e:
+            print(f"Warning: Could not initialize database manager: {e}")
+            return None
+    return _db_manager
+
 
 # Background task reference
 broadcast_task = None
@@ -413,78 +455,110 @@ async def get_redis_stats():
 
 @app.get("/api/goals")
 async def get_goals():
-    """Get active goals and tasks."""
-    goals_file = DATA_DIR / "goals" / "goals.json"
-    tasks_file = DATA_DIR / "goals" / "tasks.json"
+    """Get active goals and tasks from PostgreSQL database."""
+    try:
+        db = get_db_manager()
+        if not db:
+            return {
+                "summary": {
+                    "total_goals": 0,
+                    "total_tasks": 0,
+                    "goals_by_status": {
+                        "pending": 0,
+                        "in_progress": 0,
+                        "completed": 0,
+                        "cancelled": 0,
+                    },
+                    "tasks_by_status": {
+                        "pending": 0,
+                        "in_progress": 0,
+                        "completed": 0,
+                        "cancelled": 0,
+                    },
+                },
+                "recent_goals": [],
+                "active_tasks": [],
+                "error": "Database not available",
+            }
 
-    goals_data = {}
-    tasks_data = {}
+        # Get all goals and tasks from database
+        goals = db.list_goals()
+        tasks = db.list_tasks()
 
-    # Try to load from files first
-    if goals_file.exists():
-        try:
-            with open(goals_file, "r") as f:
-                goals_data = json.load(f)
-        except Exception:
-            pass
+        # Convert to dicts
+        goals_data = {g.id: g.to_dict() for g in goals}
+        tasks_data = {t.id: t.to_dict() for t in tasks}
 
-    if tasks_file.exists():
-        try:
-            with open(tasks_file, "r") as f:
-                tasks_data = json.load(f)
-        except Exception:
-            pass
+        # Aggregate stats
+        total_goals = len(goals_data)
+        total_tasks = len(tasks_data)
 
-    # If no files exist, try to load from Redis cache
-    if not goals_data and not tasks_data:
-        try:
-            client = get_redis_client()
-            if client:
-                cached_state = client.get("goal_agent:state:full")
-                if cached_state:
-                    state = json.loads(cached_state)
-                    goals_data = state.get("goals", {})
-                    tasks_data = state.get("tasks", {})
-        except Exception:
-            pass  # Silent fail - will show empty goals/tasks
+        goals_by_status = {
+            "pending": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "cancelled": 0,
+        }
+        tasks_by_status = {
+            "pending": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "cancelled": 0,
+        }
 
-    # Aggregate stats
-    total_goals = len(goals_data)
-    total_tasks = len(tasks_data)
+        for goal in goals_data.values():
+            status = goal.get("status", "pending")
+            goals_by_status[status] = goals_by_status.get(status, 0) + 1
 
-    goals_by_status = {"pending": 0, "in_progress": 0, "completed": 0, "cancelled": 0}
-    tasks_by_status = {"pending": 0, "in_progress": 0, "completed": 0, "cancelled": 0}
+        for task in tasks_data.values():
+            status = task.get("status", "pending")
+            tasks_by_status[status] = tasks_by_status.get(status, 0) + 1
 
-    for goal in goals_data.values():
-        status = goal.get("status", "pending")
-        goals_by_status[status] = goals_by_status.get(status, 0) + 1
+        # Get recent goals
+        recent_goals = sorted(
+            goals_data.values(), key=lambda x: x.get("updated_at", ""), reverse=True
+        )[:5]
 
-    for task in tasks_data.values():
-        status = task.get("status", "pending")
-        tasks_by_status[status] = tasks_by_status.get(status, 0) + 1
+        # Get active tasks
+        active_tasks = [
+            task
+            for task in tasks_data.values()
+            if task.get("status") in ["in_progress", "pending"]
+        ][:10]
 
-    # Get recent goals
-    recent_goals = sorted(
-        goals_data.values(), key=lambda x: x.get("updated_at", ""), reverse=True
-    )[:5]
-
-    # Get active tasks
-    active_tasks = [
-        task
-        for task in tasks_data.values()
-        if task.get("status") in ["in_progress", "pending"]
-    ][:10]
-
-    return {
-        "summary": {
-            "total_goals": total_goals,
-            "total_tasks": total_tasks,
-            "goals_by_status": goals_by_status,
-            "tasks_by_status": tasks_by_status,
-        },
-        "recent_goals": recent_goals,
-        "active_tasks": active_tasks,
-    }
+        return {
+            "summary": {
+                "total_goals": total_goals,
+                "total_tasks": total_tasks,
+                "goals_by_status": goals_by_status,
+                "tasks_by_status": tasks_by_status,
+            },
+            "recent_goals": recent_goals,
+            "active_tasks": active_tasks,
+            "source": "PostgreSQL",
+        }
+    except Exception as e:
+        return {
+            "summary": {
+                "total_goals": 0,
+                "total_tasks": 0,
+                "goals_by_status": {
+                    "pending": 0,
+                    "in_progress": 0,
+                    "completed": 0,
+                    "cancelled": 0,
+                },
+                "tasks_by_status": {
+                    "pending": 0,
+                    "in_progress": 0,
+                    "completed": 0,
+                    "cancelled": 0,
+                },
+            },
+            "recent_goals": [],
+            "active_tasks": [],
+            "error": str(e),
+        }
 
 
 @app.get("/api/logs")
@@ -841,28 +915,20 @@ async def get_environment():
 
 @app.get("/api/tasks/list")
 async def list_tasks():
-    """Get list of all tasks from goal agent data files or Redis cache."""
-    tasks_file = PROJECT_ROOT / "data" / "goals" / "tasks.json"
-    tasks_data = {}
-
+    """Get list of all tasks from PostgreSQL database."""
     try:
-        # Try loading from file first
-        if tasks_file.exists():
-            with open(tasks_file, "r") as f:
-                tasks_data = json.load(f)
+        db = get_db_manager()
+        if not db:
+            return {"error": "Database not available", "tasks": [], "count": 0}
 
-        # If no file, try Redis cache
-        if not tasks_data:
-            client = get_redis_client()
-            if client:
-                cached_state = client.get("goal_agent:state:full")
-                if cached_state:
-                    state = json.loads(cached_state)
-                    tasks_data = state.get("tasks", {})
+        # Get all tasks from database
+        tasks = db.list_tasks()
+        tasks_list = [task.to_dict() for task in tasks]
 
         return {
-            "tasks": list(tasks_data.values()),
-            "count": len(tasks_data),
+            "tasks": tasks_list,
+            "count": len(tasks_list),
+            "source": "PostgreSQL",
         }
     except Exception as e:
         return {"error": str(e), "tasks": [], "count": 0}
@@ -870,28 +936,20 @@ async def list_tasks():
 
 @app.get("/api/goals/list")
 async def list_goals():
-    """Get list of all goals with full details."""
-    goals_file = DATA_DIR / "goals" / "goals.json"
-    goals_data = {}
-
+    """Get list of all goals with full details from PostgreSQL database."""
     try:
-        # Try loading from file first
-        if goals_file.exists():
-            with open(goals_file, "r") as f:
-                goals_data = json.load(f)
+        db = get_db_manager()
+        if not db:
+            return {"error": "Database not available", "goals": [], "count": 0}
 
-        # If no file, try Redis cache
-        if not goals_data:
-            client = get_redis_client()
-            if client:
-                cached_state = client.get("goal_agent:state:full")
-                if cached_state:
-                    state = json.loads(cached_state)
-                    goals_data = state.get("goals", {})
+        # Get all goals from database
+        goals = db.list_goals()
+        goals_list = [goal.to_dict() for goal in goals]
 
         return {
-            "goals": list(goals_data.values()),
-            "count": len(goals_data),
+            "goals": goals_list,
+            "count": len(goals_list),
+            "source": "PostgreSQL",
         }
     except Exception as e:
         return {"error": str(e), "goals": [], "count": 0}
@@ -899,51 +957,26 @@ async def list_goals():
 
 @app.get("/api/goals/{goal_id}")
 async def get_goal_details(goal_id: str):
-    """Get detailed information about a specific goal including all its tasks."""
-    goals_file = DATA_DIR / "goals" / "goals.json"
-    tasks_file = DATA_DIR / "goals" / "tasks.json"
-
-    goals_data = {}
-    tasks_data = {}
-
+    """Get detailed information about a specific goal including all its tasks from PostgreSQL."""
     try:
-        # Try loading from files first
-        if goals_file.exists():
-            with open(goals_file, "r") as f:
-                goals_data = json.load(f)
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
 
-        if tasks_file.exists():
-            with open(tasks_file, "r") as f:
-                tasks_data = json.load(f)
-
-        # If no files, try Redis cache
-        if not goals_data:
-            client = get_redis_client()
-            if client:
-                cached_state = client.get("goal_agent:state:full")
-                if cached_state:
-                    state = json.loads(cached_state)
-                    goals_data = state.get("goals", {})
-                    tasks_data = state.get("tasks", {})
-
-        if not goals_data:
-            raise HTTPException(status_code=404, detail="No goals found")
-
-        if goal_id not in goals_data:
+        # Get goal from database
+        goal = db.get_goal(goal_id)
+        if not goal:
             raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
 
-        goal = goals_data[goal_id]
-
-        # Load tasks for this goal
-        goal_tasks = [
-            task for task in tasks_data.values() if task.get("goal_id") == goal_id
-        ]
+        # Get all tasks for this goal
+        tasks = db.list_tasks(goal_id=goal_id)
+        goal_tasks = [task.to_dict() for task in tasks]
 
         # Sort tasks by created_at
         goal_tasks.sort(key=lambda x: x.get("created_at", ""), reverse=False)
 
         return {
-            "goal": goal,
+            "goal": goal.to_dict(),
             "tasks": goal_tasks,
             "task_count": len(goal_tasks),
             "tasks_by_status": {
@@ -958,6 +991,190 @@ async def get_goal_details(goal_id: str):
                     1 for t in goal_tasks if t.get("status") == "cancelled"
                 ),
             },
+            "source": "PostgreSQL",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/goals/{goal_id}")
+async def delete_goal(goal_id: str):
+    """Delete a goal and all its tasks from PostgreSQL."""
+    try:
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        # Get goal info before deletion
+        goal = db.get_goal(goal_id)
+        if not goal:
+            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+
+        # Get tasks count before deletion
+        tasks = db.list_tasks(goal_id=goal_id)
+        task_count = len(tasks)
+
+        # Delete goal (cascades to tasks)
+        success = db.delete_goal(goal_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to delete goal {goal_id}"
+            )
+
+        return {
+            "success": True,
+            "deleted_goal_id": goal_id,
+            "deleted_tasks_count": task_count,
+            "message": f"Goal {goal_id} and {task_count} task(s) deleted successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a task from PostgreSQL."""
+    try:
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        # Get task info before deletion
+        task = db.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        goal_id = task.goal_id
+
+        # Delete task
+        success = db.delete_task(task_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to delete task {task_id}"
+            )
+
+        return {
+            "success": True,
+            "deleted_task_id": task_id,
+            "goal_id": goal_id,
+            "message": f"Task {task_id} deleted successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/goals")
+async def create_goal(goal_data: CreateGoalRequest):
+    """Create a new goal in PostgreSQL."""
+    try:
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        # Validate priority
+        if goal_data.priority not in ["high", "medium", "low"]:
+            raise HTTPException(
+                status_code=400, detail="Invalid priority. Must be high, medium, or low"
+            )
+
+        # Initialize goal agent to use its create_goal logic
+        from servers.goal_agent_server import agent
+
+        new_goal = agent.create_goal(
+            description=goal_data.description,
+            priority=goal_data.priority,
+            repos=goal_data.repos,
+            metadata=goal_data.metadata,
+        )
+
+        return {
+            "success": True,
+            "goal": new_goal,
+            "message": f"Goal {new_goal['id']} created successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/goals/{goal_id}/tasks")
+async def add_tasks_to_goal(goal_id: str, tasks_data: AddTasksRequest):
+    """Add tasks to a goal in PostgreSQL."""
+    try:
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        # Verify goal exists
+        goal = db.get_goal(goal_id)
+        if not goal:
+            raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+
+        # Validate subtasks
+        if not tasks_data.subtasks:
+            raise HTTPException(status_code=400, detail="At least one task is required")
+
+        # Use goal agent to break down goal
+        from servers.goal_agent_server import agent
+
+        result = agent.break_down_goal(goal_id, tasks_data.subtasks)
+
+        return {
+            "success": True,
+            "goal_id": goal_id,
+            "tasks_added": len(tasks_data.subtasks),
+            "goal_status": result["status"],
+            "message": f"Added {len(tasks_data.subtasks)} task(s) to {goal_id}",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/tasks/{task_id}/status")
+async def update_task_status(task_id: str, status_data: UpdateTaskStatusRequest):
+    """Update task status in PostgreSQL."""
+    try:
+        db = get_db_manager()
+        if not db:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        # Validate status
+        if status_data.status not in [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed",
+            "blocked",
+        ]:
+            raise HTTPException(status_code=400, detail="Invalid status")
+
+        # Get task to verify it exists
+        task = db.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        # Update task
+        from servers.goal_agent_server import agent
+
+        updated_task = agent.update_task_status(
+            task_id, status_data.status, status_data.result
+        )
+
+        return {
+            "success": True,
+            "task": updated_task,
+            "message": f"Task {task_id} updated to {status_data.status}",
         }
     except HTTPException:
         raise
@@ -1109,38 +1326,20 @@ async def collect_dashboard_data(include_system_stats: bool = True) -> dict:
                 }
             )
 
-        # Collect goals summary
-        goals_file = DATA_DIR / "goals" / "goals.json"
-        tasks_file = DATA_DIR / "goals" / "tasks.json"
-
+        # Collect goals summary from PostgreSQL
         goals_data = {}
         tasks_data = {}
 
-        if goals_file.exists():
-            try:
-                with open(goals_file, "r") as f:
-                    goals_data = json.load(f)
-            except Exception:
-                pass
-
-        if tasks_file.exists():
-            try:
-                with open(tasks_file, "r") as f:
-                    tasks_data = json.load(f)
-            except Exception:
-                pass
-
-        # If no files exist, try Redis cache
-        if not goals_data and not tasks_data:
-            try:
-                if redis_client:
-                    cached_state = redis_client.get("goal_agent:state:full")
-                    if cached_state:
-                        state = json.loads(cached_state)
-                        goals_data = state.get("goals", {})
-                        tasks_data = state.get("tasks", {})
-            except Exception:
-                pass
+        try:
+            db = get_db_manager()
+            if db:
+                # Get from database
+                goals = db.list_goals()
+                tasks = db.list_tasks()
+                goals_data = {g.id: g.to_dict() for g in goals}
+                tasks_data = {t.id: t.to_dict() for t in tasks}
+        except Exception:
+            pass  # Silent fail - will show empty goals/tasks
 
         total_goals = len(goals_data)
         total_tasks = len(tasks_data)

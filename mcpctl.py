@@ -5,9 +5,11 @@ mcpctl - Interactive CLI Toolkit for MCP Server Management
 A unified command-line interface for managing MCP servers locally and in CI/CD.
 
 Usage:
-    mcpctl start        # Start all servers
+    mcpctl run          # Start all servers and dashboard (recommended)
+    mcpctl start        # Validate server configuration
     mcpctl stop         # Stop all servers
     mcpctl status       # List running servers
+    mcpctl dashboard    # Start dashboard only
     mcpctl logs github  # Tail logs for specific server
     mcpctl test         # Run quick integration checks
 """
@@ -475,9 +477,7 @@ def logs(server, lines, follow, all):
 
     if not log_file.exists():
         print_warning(f"Log file not found: {log_file}")
-        print_info(
-            f"Server may not have been started yet or logs are not being written"
-        )
+        print_info("Server may not have been started yet or logs are not being written")
         click.echo()
         sys.exit(1)
 
@@ -576,6 +576,149 @@ def dashboard():
 
 
 @cli.command()
+@click.option(
+    "--dashboard-only",
+    is_flag=True,
+    help="Start only the dashboard without starting servers",
+)
+@click.option(
+    "--servers-only", is_flag=True, help="Start only the servers without the dashboard"
+)
+def run(dashboard_only, servers_only):
+    """Start all MCP servers and dashboard with a single command"""
+    print_header("Starting MCP Environment")
+
+    load_env()
+
+    # Configuration check
+    click.echo(f"{Colors.BOLD}Pre-flight Checks{Colors.RESET}")
+    click.echo("─" * 60)
+
+    # Check server files
+    all_found = True
+    for key, server in SERVERS.items():
+        if not server["script"].exists():
+            print_error(f"{server['name']} - File not found")
+            all_found = False
+
+    if not all_found:
+        print_error("Some server files are missing")
+        sys.exit(1)
+
+    # Check Redis
+    redis_running = check_redis()
+    if redis_running:
+        print_success("Redis is running")
+    else:
+        print_warning("Redis is not running - Memory Cache Server may not work")
+
+    click.echo()
+
+    # Start servers unless dashboard-only
+    if not dashboard_only:
+        click.echo(f"{Colors.BOLD}Starting MCP Servers{Colors.RESET}")
+        click.echo("─" * 60)
+
+        # Get virtual environment Python
+        venv_python = PROJECT_ROOT / "mcp-env" / "bin" / "python"
+        if not venv_python.exists():
+            venv_python = sys.executable  # Fall back to current Python
+
+        started_servers = []
+        failed_servers = []
+
+        for key, server in SERVERS.items():
+            try:
+                # Check if already running
+                server_processes = find_server_processes()
+                if any(p["key"] == key for p in server_processes):
+                    print_warning(f"{server['name']} is already running")
+                    continue
+
+                # Start server in background
+                log_file = server["log"]
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+
+                cmd = f"nohup {venv_python} {server['script']} > {log_file} 2>&1 &"
+
+                subprocess.Popen(
+                    cmd,
+                    shell=True,
+                    cwd=PROJECT_ROOT,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    start_new_session=True,
+                )
+
+                # Give it a moment to start
+                time.sleep(0.3)
+
+                # Verify it started
+                server_processes = find_server_processes()
+                if any(p["key"] == key for p in server_processes):
+                    print_success(f"Started {server['name']}")
+                    started_servers.append(key)
+                else:
+                    print_warning(f"Started {server['name']} but unable to verify")
+                    started_servers.append(key)
+
+            except Exception as e:
+                print_error(f"Failed to start {server['name']}: {e}")
+                failed_servers.append(key)
+
+        click.echo()
+        if started_servers:
+            print_success(f"Started {len(started_servers)} server(s)")
+        if failed_servers:
+            print_error(f"Failed to start {len(failed_servers)} server(s)")
+        click.echo()
+
+    # Start dashboard unless servers-only
+    if not servers_only:
+        click.echo(f"{Colors.BOLD}Starting Dashboard{Colors.RESET}")
+        click.echo("─" * 60)
+
+        dashboard_script = SERVERS_DIR / "dashboard_server.py"
+
+        if not dashboard_script.exists():
+            print_error(f"Dashboard script not found: {dashboard_script}")
+            sys.exit(1)
+
+        print_info("Dashboard URL: http://localhost:8000")
+        print_info("Press CTRL+C to stop the dashboard")
+        click.echo()
+
+        try:
+            subprocess.run([sys.executable, str(dashboard_script)], cwd=PROJECT_ROOT)
+        except KeyboardInterrupt:
+            click.echo("\n")
+            print_header("Shutting Down")
+            print_info("Dashboard stopped")
+
+            if not dashboard_only:
+                click.echo("\nMCP servers are still running in the background.")
+                click.echo("To stop them, run:")
+                click.echo(f"  {Colors.CYAN}mcpctl stop{Colors.RESET}")
+            click.echo()
+        except Exception as e:
+            print_error(f"Failed to start dashboard: {e}")
+            sys.exit(1)
+    else:
+        click.echo()
+        print_success("All servers started in background")
+        click.echo()
+        print_info("To view server status:")
+        click.echo(f"  {Colors.CYAN}mcpctl status{Colors.RESET}")
+        click.echo()
+        print_info("To start the dashboard:")
+        click.echo(f"  {Colors.CYAN}mcpctl dashboard{Colors.RESET}")
+        click.echo()
+        print_info("To stop all servers:")
+        click.echo(f"  {Colors.CYAN}mcpctl stop{Colors.RESET}")
+        click.echo()
+
+
+@cli.command()
 def config():
     """Show current configuration and environment"""
     print_header("MCP Configuration")
@@ -634,8 +777,6 @@ def config():
 @click.argument("server")
 def restart(server):
     """Restart a specific server (stop then validate config)"""
-    import psutil  # Import here to avoid unused import warning
-
     print_header(f"Restarting {server}")
 
     # Normalize server name

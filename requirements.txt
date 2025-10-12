@@ -11,7 +11,11 @@ uvicorn[standard]>=0.30.0
 # GitHub integration
 PyGithub>=2.5.0
 
-# Redis for caching
+# PostgreSQL for persistence
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.23
+
+# Redis for caching only
 redis>=5.0.0
 
 # Process management for scripts
