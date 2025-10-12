@@ -1,14 +1,40 @@
 # Core MCP and API dependencies
 mcp>=1.0.0
-pydantic>=2.6.0,<2.10.0
-requests>=2.31.0
+pydantic>=2.6.0,<3.0.0
+requests>=2.32.3
 python-dotenv>=1.0.0
 
 # GitHub integration
-PyGithub>=2.1.0
+PyGithub>=2.5.0
+
+# Redis for caching
+redis>=5.0.0
 
 # Process management for scripts
 psutil>=5.9.0
 
-# Optional: For better logging
-colorlog>=6.7.0
+# URL parsing and validation
+urllib3>=2.0.0
+
+# Better logging (optional but recommended)
+colorlog>=6.9.0
+
+# Testing dependencies (optional)
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+
+# Development dependencies (optional)
+black>=24.0.0  # Code formatting
+flake8>=7.0.0  # Linting
+mypy>=1.8.0    # Type checking
+isort>=5.13.0  # Import sorting
+
+# Performance monitoring (optional)
+memory-profiler>=0.61.0
+py-spy>=0.3.14
+
+# Security scanning (optional)
+bandit>=1.7.5
+safety>=3.0.0

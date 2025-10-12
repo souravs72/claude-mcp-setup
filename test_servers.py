@@ -19,7 +19,7 @@ def test_imports() -> Tuple[bool, List[str]]:
     """Test if all server modules can be imported."""
     logger.info("Testing module imports...")
     errors = []
-    
+
     modules = [
         ("servers.logging_config", "Logging Config"),
         ("servers.config", "Configuration Management"),
@@ -30,7 +30,7 @@ def test_imports() -> Tuple[bool, List[str]]:
         ("servers.internet_server", "Internet Server"),
         ("servers.goal_agent_server", "Goal Agent Server"),
     ]
-    
+
     for module_name, display_name in modules:
         try:
             __import__(module_name)
@@ -43,7 +43,7 @@ def test_imports() -> Tuple[bool, List[str]]:
             error_msg = f"✗ {display_name}: Unexpected error - {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
-    
+
     return len(errors) == 0, errors
 
 
@@ -51,27 +51,24 @@ def test_configurations() -> Tuple[bool, List[str]]:
     """Test configuration loading and validation."""
     logger.info("Testing configurations...")
     errors = []
-    
-    from servers.config import (
-        FrappeConfig, GitHubConfig, JiraConfig, 
-        InternetConfig, load_env_file
-    )
-    
+
+    from servers.config import FrappeConfig, GitHubConfig, JiraConfig, InternetConfig, load_env_file
+
     # Load environment
     load_env_file()
-    
+
     configs = [
         (FrappeConfig, "Frappe"),
         (GitHubConfig, "GitHub"),
         (JiraConfig, "Jira"),
         (InternetConfig, "Internet"),
     ]
-    
+
     for config_class, name in configs:
         try:
             config = config_class()
             is_valid, validation_errors = config.validate()
-            
+
             if is_valid:
                 logger.info(f"✓ {name} Configuration: Valid")
             else:
@@ -82,7 +79,7 @@ def test_configurations() -> Tuple[bool, List[str]]:
             error_msg = f"✗ {name} Configuration: {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
-    
+
     return len(errors) == 0, errors
 
 
@@ -90,7 +87,7 @@ def test_client_initialization() -> Tuple[bool, List[str]]:
     """Test if clients can be initialized."""
     logger.info("Testing client initialization...")
     errors = []
-    
+
     clients = [
         ("frappe_server", "frappe_client", "Frappe"),
         ("github_server", "github_client", "GitHub"),
@@ -98,12 +95,12 @@ def test_client_initialization() -> Tuple[bool, List[str]]:
         ("internet_server", "internet_client", "Internet"),
         ("goal_agent_server", "agent", "Goal Agent"),
     ]
-    
+
     for module_name, client_name, display_name in clients:
         try:
             module = __import__(f"servers.{module_name}", fromlist=[client_name])
             client = getattr(module, client_name)
-            
+
             if client is not None:
                 logger.info(f"✓ {display_name} Client: Initialized")
             else:
@@ -114,7 +111,7 @@ def test_client_initialization() -> Tuple[bool, List[str]]:
             error_msg = f"✗ {display_name} Client: {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
-    
+
     return len(errors) == 0, errors
 
 
@@ -122,9 +119,9 @@ def test_logging_setup() -> Tuple[bool, List[str]]:
     """Test logging configuration."""
     logger.info("Testing logging setup...")
     errors = []
-    
+
     log_dir = Path("logs")
-    
+
     if not log_dir.exists():
         try:
             log_dir.mkdir(parents=True)
@@ -134,13 +131,13 @@ def test_logging_setup() -> Tuple[bool, List[str]]:
             logger.error(error_msg)
             errors.append(error_msg)
             return False, errors
-    
+
     if not log_dir.is_dir():
         error_msg = "✗ logs path exists but is not a directory"
         logger.error(error_msg)
         errors.append(error_msg)
         return False, errors
-    
+
     # Test write permissions
     test_file = log_dir / "test.log"
     try:
@@ -152,7 +149,7 @@ def test_logging_setup() -> Tuple[bool, List[str]]:
         logger.error(error_msg)
         errors.append(error_msg)
         return False, errors
-    
+
     logger.info("✓ Logging setup complete")
     return True, []
 
@@ -161,7 +158,7 @@ def test_mcp_tools() -> Tuple[bool, List[str]]:
     """Test if MCP tools are properly registered."""
     logger.info("Testing MCP tool registration...")
     errors = []
-    
+
     servers = [
         ("frappe_server", ["frappe_get_document", "frappe_get_list", "frappe_create_document"]),
         ("github_server", ["list_repositories", "get_file_content", "create_issue"]),
@@ -169,31 +166,31 @@ def test_mcp_tools() -> Tuple[bool, List[str]]:
         ("internet_server", ["web_search", "web_fetch"]),
         ("goal_agent_server", ["create_goal", "break_down_goal", "get_next_tasks"]),
     ]
-    
+
     for module_name, expected_tools in servers:
         try:
             module = __import__(f"servers.{module_name}", fromlist=["mcp"])
             mcp = getattr(module, "mcp")
-            
+
             # Check if tools are registered
             registered_tools = []
-            if hasattr(mcp, '_tools'):
+            if hasattr(mcp, "_tools"):
                 registered_tools = list(mcp._tools.keys())
-            
+
             missing_tools = [tool for tool in expected_tools if tool not in registered_tools]
-            
+
             if not missing_tools:
                 logger.info(f"✓ {module_name}: All tools registered")
             else:
                 error_msg = f"⚠ {module_name}: Missing tools - {', '.join(missing_tools)}"
                 logger.warning(error_msg)
                 errors.append(error_msg)
-                
+
         except Exception as e:
             error_msg = f"✗ {module_name}: Could not check tools - {str(e)}"
             logger.error(error_msg)
             errors.append(error_msg)
-    
+
     return len(errors) == 0, errors
 
 
@@ -202,20 +199,20 @@ def print_summary(results: dict):
     print("\n" + "=" * 70)
     print("SERVER HEALTH CHECK SUMMARY")
     print("=" * 70)
-    
+
     all_passed = True
-    
+
     for test_name, (passed, errors) in results.items():
         status = "✓ PASSED" if passed else "✗ FAILED"
         print(f"\n{test_name}: {status}")
-        
+
         if errors:
             all_passed = False
             for error in errors:
                 print(f"  {error}")
-    
+
     print("\n" + "=" * 70)
-    
+
     if all_passed:
         print("✓ All tests passed! Servers are ready for production.")
     else:
@@ -225,9 +222,9 @@ def print_summary(results: dict):
         print("  2. Verify API credentials are correct")
         print("  3. Ensure all dependencies are installed")
         print("  4. Check logs/ directory permissions")
-    
+
     print("=" * 70 + "\n")
-    
+
     return all_passed
 
 
@@ -236,19 +233,19 @@ def main():
     print("\n" + "=" * 70)
     print("MCP SERVER HEALTH CHECK")
     print("=" * 70 + "\n")
-    
+
     results = {}
-    
+
     # Run tests
     results["1. Module Imports"] = test_imports()
     results["2. Configuration Loading"] = test_configurations()
     results["3. Logging Setup"] = test_logging_setup()
     results["4. Client Initialization"] = test_client_initialization()
     results["5. MCP Tool Registration"] = test_mcp_tools()
-    
+
     # Print summary
     all_passed = print_summary(results)
-    
+
     # Exit with appropriate code
     sys.exit(0 if all_passed else 1)
 

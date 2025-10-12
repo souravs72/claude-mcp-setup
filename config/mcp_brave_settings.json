@@ -37,6 +37,14 @@
     "goal-agent-server": {
       "command": "python",
       "args": ["/path/to/your/project/servers/goal_agent_server.py"]
+    },
+    "memory-cache": {
+      "command": "python",
+      "args": ["/path/to/servers/memory_cache_server.py"],
+      "env": {
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      }
     }
   }
 }
