@@ -9,6 +9,7 @@ __pycache__/
 .Python
 venv/
 mcp-env/
+data/
 
 # Logs and PIDs
 logs/*.log
@@ -24,3 +25,4 @@ Thumbs.db
 claude-desktop-debian/
 claude-desktop-debian/*
 config/mcp_settings.json
+mcp_servers.egg-info/

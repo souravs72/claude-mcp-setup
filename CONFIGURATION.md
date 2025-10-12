@@ -1,438 +1,672 @@
-# .env Configuration Guide
+# Configuration Guide
 
-## 🔧 Complete `.env` File Setup
+Complete environment configuration reference for all MCP servers.
 
-Copy this template and fill in your actual values:
+## Configuration Architecture
 
-```bash
-# ============================================
-# BRAVE SEARCH (Optional - for web search)
-# ============================================
-BRAVE_API_KEY=your_brave_api_key_here
-
-# ============================================
-# GITHUB (Required for GitHub integration)
-# ============================================
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_yourGitHubTokenHere
-
-# ============================================
-# FRAPPE (Required for Frappe/ERPNext)
-# ============================================
-FRAPPE_SITE_URL=http://127.0.0.1:8005
-FRAPPE_API_KEY=your_frappe_api_key
-FRAPPE_API_SECRET=your_frappe_api_secret
-
-# ============================================
-# GOOGLE SEARCH (Required for web search)
-# ============================================
-GOOGLE_API_KEY=AIzaSyYourGoogleAPIKeyHere
-GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
-
-# ============================================
-# JIRA (Required for Jira integration)
-# ============================================
-JIRA_BASE_URL=https://your-domain.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your_jira_api_token_here
-JIRA_PROJECT_KEY=CGV2
-JIRA_RATE_LIMIT_DELAY=0.5
+```
+┌─────────────────────────────────────────────┐
+│           .env File (gitignored)            │
+│  Human-readable key=value pairs             │
+└──────────────────┬──────────────────────────┘
+                   │ loaded by python-dotenv
+                   ▼
+┌─────────────────────────────────────────────┐
+│         Environment Variables               │
+│  os.getenv() accessible to all servers      │
+└──────────────────┬──────────────────────────┘
+                   │ parsed by config.py
+                   ▼
+┌─────────────────────────────────────────────┐
+│      Typed Configuration Classes            │
+│  @dataclass with validation                 │
+│  • FrappeConfig                             │
+│  • GitHubConfig                             │
+│  • JiraConfig                               │
+│  • RedisConfig                              │
+│  • InternetConfig                           │
+└─────────────────────────────────────────────┘
 ```
 
----
+## Quick Setup
 
-## 📝 How to Get Each Credential
-
-### 1. BRAVE_API_KEY (Optional)
-**Used for:** Alternative web search
-
-**How to get:**
-1. Go to https://brave.com/search/api/
-2. Sign up for Brave Search API
-3. Get your API key from dashboard
-4. **Note:** This is optional if you're using Google Search
-
----
-
-### 2. GITHUB_PERSONAL_ACCESS_TOKEN
-**Used for:** GitHub repository access, issues, PRs
-
-**How to get:**
-1. Go to https://github.com/settings/tokens
-2. Click "Generate new token" → "Generate new token (classic)"
-3. Give it a name: `MCP Server Token`
-4. Select scopes:
-   - ✅ `repo` (Full control of private repositories)
-   - ✅ `read:org` (Read org data)
-   - ✅ `workflow` (Update GitHub Actions workflows)
-5. Click "Generate token"
-6. **Copy immediately** (you won't see it again!)
-7. Format: `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-
-**Example:**
 ```bash
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyz
+# Copy template
+cp .env.example .env
+
+# Edit with your credentials
+nano .env  # or vim, code, etc.
+
+# Validate configuration
+python -c "from servers.config import *; print('✓ Valid')"
 ```
 
----
+## Configuration by Server
 
-### 3. FRAPPE Configuration
-**Used for:** Frappe Framework / ERPNext integration
+### 🔴 Required: Redis (Memory Cache Server)
 
-#### FRAPPE_SITE_URL
-Your Frappe site URL:
 ```bash
-# Local development
-FRAPPE_SITE_URL=http://127.0.0.1:8005
+# Network
+REDIS_HOST=localhost           # Redis server host
+REDIS_PORT=6379                # Redis server port (default: 6379)
+REDIS_DB=0                     # Database number (0-15)
 
-# Or custom port
-FRAPPE_SITE_URL=http://localhost:8000
+# Security
+REDIS_PASSWORD=                # Leave empty for no password
 
-# Production
-FRAPPE_SITE_URL=https://your-site.frappe.cloud
+# Connection Pool
+REDIS_MAX_CONNECTIONS=50       # Maximum connections in pool
+REDIS_SOCKET_TIMEOUT=5         # Socket timeout in seconds
+REDIS_SOCKET_CONNECT_TIMEOUT=5 # Connection timeout in seconds
+REDIS_HEALTH_CHECK_INTERVAL=30 # Health check interval in seconds
+REDIS_RETRY_ON_TIMEOUT=true    # Retry on timeout errors
+
+# Response Format
+REDIS_DECODE_RESPONSES=true    # Automatically decode bytes to strings
 ```
 
-#### FRAPPE_API_KEY & FRAPPE_API_SECRET
-**How to get:**
-1. Login to your Frappe site
-2. Go to: **User Menu** → **API Access**
-3. Or direct URL: `http://your-site/app/user-api-keys`
-4. Click "Generate Keys" for your user
-5. Copy both API Key and API Secret
+**Technical Details:**
 
-**Alternative method (via console):**
+| Parameter | Range | Impact | Default |
+|-----------|-------|--------|---------|
+| `MAX_CONNECTIONS` | 10-500 | Pool size, memory usage | 50 |
+| `SOCKET_TIMEOUT` | 1-30s | Query timeout | 5s |
+| `HEALTH_CHECK_INTERVAL` | 10-300s | Connection validation | 30s |
+
+**Connection Pool Sizing:**
 ```python
-# In Frappe console
-from frappe.core.doctype.user.user import generate_keys
-generate_keys("your-email@example.com")
+# Formula: connections = workers * concurrent_operations
+# Example: 10 workers * 5 ops = 50 connections
+
+# Low traffic:  10-20 connections
+# Medium:       50-100 connections
+# High:         100-200 connections
+# Very high:    200-500 connections
 ```
 
-**Example:**
+### 🔴 Required: Goal Agent Server
+
 ```bash
-FRAPPE_API_KEY=1234567890abcdef
-FRAPPE_API_SECRET=abcdefghijklmnop
+# Thread Pool
+GOAL_AGENT_MAX_WORKERS=10      # ThreadPoolExecutor size
+GOAL_AGENT_TIMEOUT=30          # Operation timeout in seconds
+
+# Caching
+CACHE_ENABLED=true             # Enable Redis caching
 ```
 
----
+**Worker Sizing Guide:**
 
-### 4. GOOGLE_API_KEY
-**Used for:** Google Custom Search API
+| Workload | Workers | Notes |
+|----------|---------|-------|
+| Development | 3-5 | Minimal resource usage |
+| Light | 5-10 | Standard usage |
+| Medium | 10-20 | Multiple concurrent goals |
+| Heavy | 20-50 | Batch operations |
 
-**How to get:**
-1. Go to https://console.cloud.google.com/
-2. Create a new project or select existing
-3. Enable **Custom Search API**:
-   - Go to "APIs & Services" → "Library"
-   - Search for "Custom Search API"
+**Performance Impact:**
+```python
+# More workers = more concurrent operations
+# But: Diminishing returns after ~20 workers
+# And: Each worker consumes memory
+
+# Memory per worker: ~10-50MB
+# 10 workers = 100-500MB
+# 50 workers = 500-2500MB
+```
+
+### 🟢 Optional: GitHub Server
+
+```bash
+# Authentication
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+# Get from: https://github.com/settings/tokens
+# Required scopes: repo, workflow, read:org
+
+# Configuration
+GITHUB_DEFAULT_BRANCH=main     # Default branch for operations
+GITHUB_TIMEOUT=30              # Request timeout in seconds
+GITHUB_MAX_RETRIES=3           # Retry attempts on failure
+```
+
+**Token Scopes Explained:**
+
+| Scope | Purpose | Required For |
+|-------|---------|--------------|
+| `repo` | Full repository access | Reading/writing code, creating PRs |
+| `workflow` | GitHub Actions | Triggering workflows |
+| `read:org` | Organization access | Private org repositories |
+| `read:user` | User info | Profile information |
+
+**Getting Your Token:**
+
+1. Visit: https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Select scopes: `repo`, `workflow`, `read:org`
+4. Generate and copy token
+5. **Save immediately** - you won't see it again!
+
+**Token Format:**
+- Classic: `ghp_` followed by 40 characters
+- Fine-grained: `github_pat_` followed by token
+
+### 🟢 Optional: Jira Server
+
+```bash
+# Instance
+JIRA_BASE_URL=https://your-company.atlassian.net
+# No trailing slash!
+
+# Authentication
+JIRA_EMAIL=developer@company.com
+JIRA_API_TOKEN=ATATTxxxxxxxxxxxxxxxxx
+# Get from: https://id.atlassian.com/manage-profile/security/api-tokens
+
+# Default Project
+JIRA_PROJECT_KEY=PROJ          # Default project for operations
+
+# Connection
+JIRA_TIMEOUT=30                # Request timeout in seconds
+JIRA_MAX_RETRIES=3             # Retry attempts
+
+# Rate Limiting
+JIRA_RATE_LIMIT_DELAY=0.5      # Seconds between requests
+```
+
+**Getting Jira Credentials:**
+
+1. **Base URL:** 
+   ```
+   https://[your-domain].atlassian.net
+   Example: https://acme-corp.atlassian.net
+   ```
+
+2. **API Token:**
+   - Visit: https://id.atlassian.com/manage-profile/security/api-tokens
+   - Click "Create API token"
+   - Name it (e.g., "Claude MCP Server")
+   - Copy token immediately
+
+3. **Email:**
+   - Must be the email associated with your Jira account
+   - Check: https://id.atlassian.com/manage-profile/email
+
+**Rate Limit Configuration:**
+
+```python
+# Jira Cloud rate limits (per IP):
+# - 150 requests per minute (free/standard)
+# - 300 requests per minute (premium)
+# - 600 requests per minute (enterprise)
+
+# Recommended delays:
+# Free/Standard:  0.5s (120 req/min)
+# Premium:        0.25s (240 req/min)
+# Enterprise:     0.1s (600 req/min)
+```
+
+### 🟢 Optional: Internet/Search Server
+
+```bash
+# Google Custom Search API
+GOOGLE_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxx
+GOOGLE_SEARCH_ENGINE_ID=xxxxxxxxxxx
+
+# Connection
+GOOGLE_TIMEOUT=15              # Request timeout
+GOOGLE_MAX_RETRIES=3           # Retry attempts
+```
+
+**Setup Instructions:**
+
+1. **Enable Custom Search API:**
+   - Visit: https://console.cloud.google.com/apis/library/customsearch.googleapis.com
    - Click "Enable"
-4. Create credentials:
-   - Go to "APIs & Services" → "Credentials"
-   - Click "Create Credentials" → "API Key"
-   - Copy the API key
-5. (Optional) Restrict the key to Custom Search API only
 
-**Example:**
-```bash
-GOOGLE_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+2. **Get API Key:**
+   - Visit: https://console.cloud.google.com/apis/credentials
+   - Create Credentials → API Key
+   - Copy key
 
----
+3. **Create Search Engine:**
+   - Visit: https://programmablesearchengine.google.com/
+   - Click "Add"
+   - Search the entire web: ON
+   - Create
+   - Copy Search Engine ID
 
-### 5. GOOGLE_SEARCH_ENGINE_ID
-**Used for:** Custom Search Engine configuration
+**Rate Limits (Free Tier):**
+- 100 queries per day
+- 10 queries per second
 
-**How to get:**
-1. Go to https://programmablesearchengine.google.com/
-2. Click "Add" to create a new search engine
-3. Configure:
-   - **Sites to search:** `www.google.com` (or your specific sites)
-   - **Name:** Any name you want
-   - **Search entire web:** Turn ON (recommended)
-4. Click "Create"
-5. Go to "Setup" → Copy your "Search engine ID"
+**Paid Tier:**
+- $5 per 1,000 queries
+- 10,000 queries per day
+- Visit: https://console.cloud.google.com/billing
 
-**Example:**
-```bash
-GOOGLE_SEARCH_ENGINE_ID=a1b2c3d4e5f6g7h8i
-```
-
-**💡 Tip:** You get 100 free searches per day. For more, you need billing enabled.
-
----
-
-### 6. JIRA Configuration
-**Used for:** Jira Cloud integration
-
-#### JIRA_BASE_URL
-Your Jira Cloud URL:
-```bash
-# Format: https://YOUR-DOMAIN.atlassian.net
-JIRA_BASE_URL=https://clapgrow.atlassian.net
-```
-
-**How to find:** Look at your Jira URL when logged in.
-
----
-
-#### JIRA_EMAIL
-The email you use to login to Jira:
-```bash
-JIRA_EMAIL=your-email@example.com
-```
-
----
-
-#### JIRA_API_TOKEN
-**How to get:**
-1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
-2. Click "Create API token"
-3. Give it a label: `MCP Server Token`
-4. Click "Create"
-5. **Copy immediately** (you won't see it again!)
-
-**Example:**
-```bash
-JIRA_API_TOKEN=ATATT3xFfGF0123456789abcdefghijklmnopqrstuvwxyz
-```
-
----
-
-#### JIRA_PROJECT_KEY
-Your default Jira project key:
-```bash
-JIRA_PROJECT_KEY=CGV2
-```
-
-**How to find:**
-1. Go to your Jira project
-2. Look at the URL: `https://domain.atlassian.net/browse/CGV2`
-3. The project key is `CGV2` (the part after `/browse/`)
-
-**Or:**
-- Look at any issue: `CGV2-123` → project key is `CGV2`
-
----
-
-#### JIRA_RATE_LIMIT_DELAY
-Delay between API requests (in seconds):
-```bash
-JIRA_RATE_LIMIT_DELAY=0.5
-```
-
-**Recommended values:**
-- `0.5` - Default (2 requests per second)
-- `1.0` - Conservative (1 request per second)
-- `0.25` - Aggressive (4 requests per second)
-
----
-
-## 📋 Complete Example
-
-Here's a filled example (use your own values!):
+### 🟢 Optional: Frappe/ERPNext Server
 
 ```bash
-# ============================================
-# BRAVE SEARCH (Optional)
-# ============================================
-BRAVE_API_KEY=BSAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# ============================================
-# GITHUB
-# ============================================
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# ============================================
-# FRAPPE
-# ============================================
+# Instance
 FRAPPE_SITE_URL=http://127.0.0.1:8005
-FRAPPE_API_KEY=1a2b3c4d5e6f7g8h
-FRAPPE_API_SECRET=9i8h7g6f5e4d3c2b
+# Or: https://yourcompany.erpnext.com
 
-# ============================================
-# GOOGLE SEARCH
-# ============================================
-GOOGLE_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GOOGLE_SEARCH_ENGINE_ID=a1b2c3d4e5f6g7h8i
+# Authentication
+FRAPPE_API_KEY=xxxxxxxxxxxxxxxx
+FRAPPE_API_SECRET=xxxxxxxxxxxxxxxx
 
-# ============================================
-# JIRA
-# ============================================
-JIRA_BASE_URL=https://clapgrow.atlassian.net
-JIRA_EMAIL=developer@clapgrow.com
-JIRA_API_TOKEN=ATATT3xFfGF0xxxxxxxxxxxxxxxxxxxxxxxxxx
-JIRA_PROJECT_KEY=CGV2
-JIRA_RATE_LIMIT_DELAY=0.5
+# Connection
+FRAPPE_TIMEOUT=30              # Request timeout
+FRAPPE_MAX_RETRIES=3           # Retry attempts
+FRAPPE_POOL_CONNECTIONS=5      # Connection pool size
+FRAPPE_POOL_MAXSIZE=10         # Max pool size
 ```
 
----
+**Getting Frappe Credentials:**
 
-## 🔒 Security Best Practices
+1. Log into your Frappe/ERPNext instance
+2. Go to: User Menu → API Access
+3. Click "Generate Keys"
+4. Copy both API Key and API Secret
+5. Store securely in `.env`
 
-### ✅ DO:
-- Keep `.env` file in `.gitignore`
-- Use separate tokens for dev/prod
-- Rotate tokens every 90 days
-- Use minimal required scopes
-- Store backups securely (encrypted)
+**Important:**
+- Keep credentials secure - they provide full access
+- Regenerate if compromised
+- Use separate keys for development/production
 
-### ❌ DON'T:
-- Commit `.env` to git
-- Share tokens in chat/email
-- Use same token across projects
-- Give tokens excessive permissions
-- Store in plain text outside project
+## Performance Tuning
 
----
+### Connection Pool Configuration
 
-## 🧪 Testing Your Configuration
-
-After filling the `.env` file, test each service:
-
-### Test Script
 ```bash
-# Run the configuration checker
-python scripts/start_all_servers.py
+# Formula: Pool size ≈ concurrent requests * 1.5
+
+# Low traffic (< 10 req/s):
+FRAPPE_POOL_CONNECTIONS=5
+FRAPPE_POOL_MAXSIZE=10
+
+# Medium traffic (10-50 req/s):
+FRAPPE_POOL_CONNECTIONS=10
+FRAPPE_POOL_MAXSIZE=20
+
+# High traffic (50-100 req/s):
+FRAPPE_POOL_CONNECTIONS=20
+FRAPPE_POOL_MAXSIZE=40
 ```
 
-### Manual Tests in Claude
+### Timeout Configuration
 
-**Test Jira:**
-```
-"List my Jira projects"
-"What issue types are in CGV2?"
-```
+```bash
+# Quick operations:
+DEFAULT_TIMEOUT=10             # Simple queries
 
-**Test GitHub:**
-```
-"List my GitHub repositories"
-```
+# Standard operations:
+DEFAULT_TIMEOUT=30             # Most use cases
 
-**Test Frappe:**
-```
-"Get list of customers from Frappe"
+# Heavy operations:
+DEFAULT_TIMEOUT=60             # Large file uploads, complex queries
 ```
 
-**Test Google Search:**
-```
-"Search the web for Python tutorials"
-```
+### Retry Strategy
 
----
+```bash
+# Default retry logic:
+DEFAULT_MAX_RETRIES=3          # Standard
+# Retries on: 500, 502, 503, 504, 429
 
-## 🚨 Troubleshooting
+# Backoff formula:
+# delay = backoff_factor * (2 ** retry_number)
+# With backoff_factor=0.5:
+# Retry 1: 0.5s
+# Retry 2: 1.0s
+# Retry 3: 2.0s
 
-### Issue: "Configuration validation failed"
-**Solution:** Check that all required fields are filled in the `.env` file
+# For unreliable networks:
+DEFAULT_MAX_RETRIES=5          # More retries
 
-### Issue: "Authentication failed" (Jira)
-**Solutions:**
-- Verify `JIRA_EMAIL` matches your Atlassian account
-- Regenerate `JIRA_API_TOKEN` if expired
-- Check `JIRA_BASE_URL` format (include `https://`)
-
-### Issue: "Authentication failed" (GitHub)
-**Solutions:**
-- Verify token hasn't expired
-- Check token has correct scopes (repo access)
-- Regenerate token if needed
-
-### Issue: "API quota exceeded" (Google)
-**Solutions:**
-- You have 100 free searches/day
-- Enable billing for more quota
-- Use Brave Search as alternative
-
-### Issue: "Connection refused" (Frappe)
-**Solutions:**
-- Verify Frappe is running: `bench start`
-- Check correct port in `FRAPPE_SITE_URL`
-- Test URL in browser first
-
----
-
-## 📁 File Location
-
-Your `.env` file should be in your project root:
-
-```
-your-mcp-project/
-├── .env                    ← Put your .env here
-├── servers/
-│   ├── jira_server.py
-│   ├── github_server.py
-│   └── ...
-├── scripts/
-└── logs/
+# For stable networks:
+DEFAULT_MAX_RETRIES=1          # Fail fast
 ```
 
----
+### Thread Pool Tuning
 
-## ✅ Verification Checklist
+```bash
+# Goal Agent workers:
+# CPU-bound work:  workers = CPU_cores * 1
+# I/O-bound work:  workers = CPU_cores * 2-4
 
-After setup, verify:
+# Examples:
+# 4-core CPU (MacBook):      GOAL_AGENT_MAX_WORKERS=10
+# 8-core CPU (Desktop):      GOAL_AGENT_MAX_WORKERS=20
+# 16-core CPU (Server):      GOAL_AGENT_MAX_WORKERS=40
+```
 
-- [ ] `.env` file exists in project root
-- [ ] All required variables are filled
-- [ ] No quotes around values
-- [ ] No spaces around `=` signs
-- [ ] `.env` is in `.gitignore`
-- [ ] Tokens are valid and not expired
-- [ ] Services respond to test commands
-- [ ] Claude Desktop restarted after changes
+## Validation
 
----
+All configuration is validated on server startup:
 
-## Updating Credentials
+```python
+# Automatic validation:
+# 1. Required fields present
+# 2. URLs properly formatted
+# 3. Token formats correct
+# 4. Numeric values in range
 
-If you need to change credentials:
+# Example validation error:
+"""
+Configuration validation failed:
+  - Missing required field: api_key
+  - Invalid JIRA_BASE_URL: must use HTTPS
+  - Invalid token format: should start with 'ghp_'
+"""
+```
 
-1. Update the `.env` file
-2. **Completely quit** Claude Desktop
-3. Restart Claude Desktop
-4. Test the affected service
+## Environment Files
 
-Changes take effect after Claude Desktop restart!
+### Development: `.env.development`
 
----
+```bash
+# Redis (local)
+REDIS_HOST=localhost
+REDIS_PORT=6379
 
-## 💡 Pro Tips
+# GitHub (development token)
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_dev_token
 
-1. **Create a `.env.example` file** with empty values for team members:
-   ```bash
-   cp .env .env.example
-   # Then remove actual values from .env.example
-   ```
+# Jira (sandbox instance)
+JIRA_BASE_URL=https://company-sandbox.atlassian.net
 
-2. **Use different keys for different environments:**
-   ```bash
-   # Development
-   .env
+# Lower limits for dev
+GOAL_AGENT_MAX_WORKERS=5
+JIRA_RATE_LIMIT_DELAY=1.0
+```
 
-   # Production  
-   .env.production
-   ```
+### Production: `.env.production`
 
-3. **Document which services you're using:**
-   ```bash
-   # Add comments in .env
-   # ✅ Using Jira
-   # ❌ Not using Brave Search
-   ```
+```bash
+# Redis (production instance)
+REDIS_HOST=redis.company.internal
+REDIS_PORT=6379
+REDIS_PASSWORD=secure_password
 
-4. **Keep a secure backup:**
-   - Store in password manager
-   - Or encrypted file
-   - Never in plain text cloud storage
+# GitHub (production token)
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_prod_token
 
----
+# Jira (production instance)
+JIRA_BASE_URL=https://company.atlassian.net
 
-## 📞 Need Help?
+# Higher limits for prod
+GOAL_AGENT_MAX_WORKERS=20
+JIRA_RATE_LIMIT_DELAY=0.25
+```
 
-If you have issues:
+### Testing: `.env.test`
 
-1. Check the logs: `logs/jira_server.log`
-2. Verify credentials in original service
-3. Test API access with curl
-4. Review error messages carefully
-5. Check this guide's troubleshooting section
+```bash
+# Use test instances
+REDIS_HOST=localhost
+REDIS_PORT=6380  # Different port
 
-Good luck!
+# Mock credentials
+GITHUB_PERSONAL_ACCESS_TOKEN=test_token
+JIRA_API_TOKEN=test_token
+```
+
+## Security Best Practices
+
+### 1. Credential Storage
+
+```bash
+# ✅ DO: Use .env file (gitignored)
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx
+
+# ❌ DON'T: Hardcode in source
+token = "ghp_xxx"  # NEVER DO THIS!
+
+# ✅ DO: Use environment variables
+token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+```
+
+### 2. File Permissions
+
+```bash
+# Secure .env file
+chmod 600 .env
+
+# Verify
+ls -la .env
+# Should show: -rw-------
+```
+
+### 3. Git Configuration
+
+```bash
+# Ensure .env is gitignored
+echo ".env" >> .gitignore
+echo ".env.*" >> .gitignore
+
+# Verify
+git status  # Should not show .env
+```
+
+### 4. Token Rotation
+
+```bash
+# Rotate tokens regularly
+# GitHub: 90 days
+# Jira: 90 days
+# Frappe: 180 days
+
+# Script to check token age:
+# python scripts/check_token_age.py
+```
+
+## Configuration Testing
+
+### Test Individual Services
+
+```bash
+# Redis
+python -c "
+from servers.config import RedisConfig
+c = RedisConfig()
+print(f'✓ Redis: {c.host}:{c.port}')
+"
+
+# GitHub
+python -c "
+from servers.config import GitHubConfig
+c = GitHubConfig()
+print(f'✓ GitHub token: {c.token[:10]}...')
+"
+
+# Jira
+python -c "
+from servers.config import JiraConfig
+c = JiraConfig()
+print(f'✓ Jira: {c.base_url}')
+"
+```
+
+### Test All Configuration
+
+```bash
+# Run comprehensive tests
+python scripts/test_servers.py
+
+# Expected output:
+# ✓ Redis connection successful
+# ✓ GitHub authentication successful
+# ✓ Jira authentication successful
+# ✓ All configurations valid
+```
+
+## Troubleshooting
+
+### Missing Required Fields
+
+```bash
+# Error: Missing required field: api_key
+
+# Solution:
+# 1. Check .env file exists
+ls -la .env
+
+# 2. Check variable is set
+grep GITHUB_PERSONAL_ACCESS_TOKEN .env
+
+# 3. Check no typos
+# Correct:   GITHUB_PERSONAL_ACCESS_TOKEN
+# Incorrect: GITHUB_TOKEN
+```
+
+### Invalid URL Format
+
+```bash
+# Error: Invalid JIRA_BASE_URL
+
+# Common issues:
+# ❌ Trailing slash:  https://company.atlassian.net/
+# ❌ HTTP instead:    http://company.atlassian.net
+# ❌ Missing domain:  https://atlassian.net
+# ❌ Wrong protocol:  company.atlassian.net
+
+# ✅ Correct format:
+JIRA_BASE_URL=https://company.atlassian.net
+```
+
+### Authentication Failures
+
+```bash
+# GitHub authentication failed
+
+# Solutions:
+# 1. Check token format
+echo $GITHUB_PERSONAL_ACCESS_TOKEN
+# Should start with ghp_ or github_pat_
+
+# 2. Check token scopes
+# Visit: https://github.com/settings/tokens
+# Ensure: repo, workflow checked
+
+# 3. Test manually
+curl -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
+  https://api.github.com/user
+```
+
+### Connection Issues
+
+```bash
+# Redis connection refused
+
+# Solutions:
+# 1. Check Redis is running
+redis-cli ping
+
+# 2. Check host/port
+echo $REDIS_HOST:$REDIS_PORT
+
+# 3. Test connection
+redis-cli -h $REDIS_HOST -p $REDIS_PORT ping
+```
+
+## Complete Example Configuration
+
+```bash
+# ===========================================
+# PRODUCTION CONFIGURATION
+# ===========================================
+
+# ===========================================
+# REQUIRED: Redis (Memory Cache)
+# ===========================================
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+REDIS_MAX_CONNECTIONS=50
+REDIS_SOCKET_TIMEOUT=5
+REDIS_SOCKET_CONNECT_TIMEOUT=5
+REDIS_HEALTH_CHECK_INTERVAL=30
+REDIS_RETRY_ON_TIMEOUT=true
+REDIS_DECODE_RESPONSES=true
+
+# ===========================================
+# REQUIRED: Goal Agent
+# ===========================================
+GOAL_AGENT_MAX_WORKERS=10
+GOAL_AGENT_TIMEOUT=30
+CACHE_ENABLED=true
+
+# ===========================================
+# OPTIONAL: GitHub
+# ===========================================
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token_here
+GITHUB_DEFAULT_BRANCH=main
+GITHUB_TIMEOUT=30
+GITHUB_MAX_RETRIES=3
+
+# ===========================================
+# OPTIONAL: Jira
+# ===========================================
+JIRA_BASE_URL=https://company.atlassian.net
+JIRA_EMAIL=developer@company.com
+JIRA_API_TOKEN=your_token_here
+JIRA_PROJECT_KEY=PROJ
+JIRA_TIMEOUT=30
+JIRA_MAX_RETRIES=3
+JIRA_RATE_LIMIT_DELAY=0.5
+
+# ===========================================
+# OPTIONAL: Google Search
+# ===========================================
+GOOGLE_API_KEY=AIzaSy_your_key_here
+GOOGLE_SEARCH_ENGINE_ID=your_id_here
+GOOGLE_TIMEOUT=15
+GOOGLE_MAX_RETRIES=3
+
+# ===========================================
+# OPTIONAL: Frappe/ERPNext
+# ===========================================
+FRAPPE_SITE_URL=http://127.0.0.1:8005
+FRAPPE_API_KEY=your_key_here
+FRAPPE_API_SECRET=your_secret_here
+FRAPPE_TIMEOUT=30
+FRAPPE_MAX_RETRIES=3
+FRAPPE_POOL_CONNECTIONS=5
+FRAPPE_POOL_MAXSIZE=10
+
+# ===========================================
+# GLOBAL SETTINGS
+# ===========================================
+CONNECTION_POOL_SIZE=10
+DEFAULT_TIMEOUT=30
+DEFAULT_MAX_RETRIES=3
+```
+
+## Reference
+
+### All Configuration Classes
+
+```python
+from servers.config import (
+    RedisConfig,      # Memory cache configuration
+    GoalAgentConfig,  # Goal agent configuration
+    GitHubConfig,     # GitHub API configuration
+    JiraConfig,       # Jira API configuration
+    InternetConfig,   # Google Search configuration
+    FrappeConfig,     # Frappe/ERPNext configuration
+)
+```
+
+### Validation Function
+
+```python
+from servers.config import validate_config
+
+# Validate configuration
+config = GitHubConfig()
+validate_config(config, logger)
+# Raises ConfigurationError if invalid
+```

@@ -1,209 +1,556 @@
-# Quick Start Guide - Goal-Based AI Agent
+# Quick Start Guide
 
-## 5-Minute Setup
+Get Claude MCP servers running in **under 10 minutes**.
 
-### Step 1: Install Dependencies
+## Prerequisites Checklist
+
+- [ ] Python 3.10 or higher (`python --version`)
+- [ ] Redis installed (or Docker available)
+- [ ] Claude Desktop installed
+- [ ] Git installed
+
+## Step 1: Install Dependencies (2 minutes)
 
 ```bash
-cd your-project-directory
+# Clone repository
+git clone <your-repo-url>
+cd claude-mcp-setup
 
-# Install all requirements
-pip install -r requirements/goal_agent_requirements.txt
-pip install -r requirements/jira_requirements.txt
-pip install -r requirements/github_requirements.txt
-pip install -r requirements/frappe_requirements.txt
-pip install -r requirements/internet_requirements.txt
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install all dependencies
+pip install -r requirements.txt
+
+# Verify installation
+python -c "import mcp, redis, github; print('✓ All packages installed')"
 ```
 
-### Step 2: Configure Environment
+## Step 2: Start Redis (1 minute)
 
+Redis is required for the Memory Cache server.
+
+### macOS (Homebrew)
 ```bash
-# Copy template
-cp .env.template .env
+brew install redis
+brew services start redis
 
-# Edit .env file with your credentials
-nano .env  # or use your preferred editor
+# Verify
+redis-cli ping  # Should return: PONG
 ```
 
-Required values:
+### Linux (Ubuntu/Debian)
 ```bash
-# Jira (get from https://id.atlassian.com/manage-profile/security/api-tokens)
-JIRA_BASE_URL=https://your-domain.atlassian.net
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis
+sudo systemctl enable redis
+
+# Verify
+redis-cli ping  # Should return: PONG
+```
+
+### Docker (All platforms)
+```bash
+docker run -d -p 6379:6379 --name redis redis:alpine
+
+# Verify
+docker exec redis redis-cli ping  # Should return: PONG
+```
+
+### Windows
+```bash
+# Download from: https://github.com/microsoftarchive/redis/releases
+# Or use WSL2 with Linux instructions above
+```
+
+## Step 3: Configure Environment (2 minutes)
+
+```bash
+# Copy example configuration
+cp .env.example .env
+
+# Edit .env file
+nano .env  # Or use your preferred editor
+```
+
+### Minimum Configuration
+
+For **basic functionality** (Goal Agent + Memory Cache):
+
+```bash
+# .env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+That's it! Goal Agent and Memory Cache work without external APIs.
+
+### Optional: GitHub Integration
+
+Get token: https://github.com/settings/tokens (scopes: `repo`, `workflow`)
+
+```bash
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token_here
+GITHUB_DEFAULT_BRANCH=main
+```
+
+### Optional: Jira Integration
+
+Get token: https://id.atlassian.com/manage-profile/security/api-tokens
+
+```bash
+JIRA_BASE_URL=https://your-company.atlassian.net
 JIRA_EMAIL=your@email.com
-JIRA_API_TOKEN=your_jira_token
+JIRA_API_TOKEN=your_token_here
 JIRA_PROJECT_KEY=PROJ
-
-# GitHub (get from https://github.com/settings/tokens)
-GITHUB_PERSONAL_ACCESS_TOKEN=your_github_token
-
-# Google Search (optional - for internet server)
-GOOGLE_API_KEY=your_google_api_key
-GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
-
-# Frappe (if using)
-FRAPPE_SITE_URL=http://127.0.0.1:8005
-FRAPPE_API_KEY=your_frappe_key
-FRAPPE_API_SECRET=your_frappe_secret
 ```
 
-### Step 3: Start Servers
+### Optional: Google Search
+
+1. Enable API: https://console.cloud.google.com/apis/library/customsearch.googleapis.com
+2. Create Search Engine: https://programmablesearchengine.google.com/
 
 ```bash
-# Start all servers at once
+GOOGLE_API_KEY=your_key_here
+GOOGLE_SEARCH_ENGINE_ID=your_id_here
+```
+
+### Optional: Frappe/ERPNext
+
+```bash
+FRAPPE_SITE_URL=http://127.0.0.1:8005
+FRAPPE_API_KEY=your_key
+FRAPPE_API_SECRET=your_secret
+```
+
+## Step 4: Test Configuration (1 minute)
+
+```bash
+# Run configuration checker
 python scripts/start_all_servers.py
 
-# Or start individually
-python servers/goal_agent_server.py &
-python servers/jira_server.py &
-python servers/github_server.py &
+# Expected output:
+# ✓ Server Files: 6/6 found
+# ✓ Redis Server: Running
+# ✓ Environment: X/Y variables set
 ```
 
-### Step 4: Configure Claude Desktop
+If you see errors, check:
+- Redis is running: `redis-cli ping`
+- Python version: `python --version` (need 3.10+)
+- Dependencies installed: `pip list | grep mcp`
 
-Edit `claude_desktop_config.json` (location varies by OS):
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+## Step 5: Configure Claude Desktop (2 minutes)
 
-Add:
+### Find Config File
+
+**macOS:**
+```bash
+open ~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+**Linux:**
+```bash
+nano ~/.config/Claude/claude_desktop_config.json
+```
+
+**Windows:**
+```bash
+notepad %APPDATA%\Claude\claude_desktop_config.json
+```
+
+### Add MCP Server Configuration
+
+**IMPORTANT:** Use **absolute paths** (not relative).
+
+Get your project path:
+```bash
+pwd  # Copy this output
+```
+
+Replace `/absolute/path/to/your/project` with the output from `pwd`:
+
 ```json
 {
   "mcpServers": {
-    "goal-agent": {
+    "memory-cache": {
       "command": "python",
-      "args": ["/full/path/to/your/servers/goal_agent_server.py"]
-    },
-    "jira": {
-      "command": "python",
-      "args": ["/full/path/to/your/servers/jira_server.py"],
+      "args": ["/absolute/path/to/your/project/servers/memory_cache_server.py"],
       "env": {
-        "JIRA_BASE_URL": "https://your-domain.atlassian.net",
-        "JIRA_EMAIL": "your@email.com",
-        "JIRA_API_TOKEN": "your_token",
-        "JIRA_PROJECT_KEY": "PROJ"
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0"
       }
     },
-    "github": {
+    "goal-agent": {
       "command": "python",
-      "args": ["/full/path/to/your/servers/github_server.py"],
+      "args": ["/absolute/path/to/your/project/servers/goal_agent_server.py"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token"
+        "GOAL_AGENT_MAX_WORKERS": "10",
+        "CACHE_ENABLED": "true"
       }
     }
   }
 }
 ```
 
-### Step 5: Restart Claude Desktop
+### Optional: Add GitHub Server
 
-Close and reopen Claude Desktop app.
-
-## First Goal in 2 Minutes
-
-Once configured, try this in Claude:
-
-```
-You: "Create a goal to add a new API endpoint for user profiles."
-
-Claude: [Uses create_goal tool]
-Created GOAL-1: Add API endpoint for user profiles
-
-You: "Break this down into tasks across my backend and frontend repos."
-
-Claude: [Uses break_down_goal tool]
-Created 5 tasks:
-- TASK-1: Design API schema (backend)
-- TASK-2: Implement endpoint (backend, depends on TASK-1)
-- TASK-3: Add tests (backend, depends on TASK-2)
-- TASK-4: Update frontend to call endpoint (frontend, depends on TASK-2)
-- TASK-5: Update API documentation (depends on TASK-2)
-
-You: "Show me the execution plan and create Jira tickets."
-
-Claude: [Uses generate_execution_plan and jira_create_issue tools]
-Execution Plan:
-- Phase 1: TASK-1 (start immediately)
-- Phase 2: TASK-2, TASK-3 (parallel after Phase 1)
-- Phase 3: TASK-4, TASK-5 (parallel after Phase 2)
-
-Created Jira tickets:
-- PROJ-101: Design API schema
-- PROJ-102: Implement endpoint
-- PROJ-103: Add tests
-- PROJ-104: Update frontend
-- PROJ-105: Update documentation
+```json
+{
+  "mcpServers": {
+    "memory-cache": { "..." },
+    "goal-agent": { "..." },
+    "github": {
+      "command": "python",
+      "args": ["/absolute/path/to/your/project/servers/github_server.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token",
+        "GITHUB_DEFAULT_BRANCH": "main"
+      }
+    }
+  }
+}
 ```
 
-## Common Commands
+### Optional: Add Jira Server
 
-### Check Server Status
+```json
+{
+  "mcpServers": {
+    "memory-cache": { "..." },
+    "goal-agent": { "..." },
+    "jira": {
+      "command": "python",
+      "args": ["/absolute/path/to/your/project/servers/jira_server.py"],
+      "env": {
+        "JIRA_BASE_URL": "https://company.atlassian.net",
+        "JIRA_EMAIL": "dev@company.com",
+        "JIRA_API_TOKEN": "your_token",
+        "JIRA_PROJECT_KEY": "PROJ"
+      }
+    }
+  }
+}
+```
+
+## Step 6: Restart Claude Desktop (1 minute)
+
+**IMPORTANT:** Full restart required (not just refresh)
+
+1. **Quit Claude Desktop completely**
+   - macOS: Cmd+Q
+   - Windows: File → Exit
+   - Linux: Close all windows
+
+2. **Verify it's closed**
+   ```bash
+   # macOS/Linux
+   ps aux | grep Claude  # Should show nothing
+   
+   # Windows (PowerShell)
+   Get-Process | Where-Object {$_.Name -like "*Claude*"}
+   ```
+
+3. **Restart Claude Desktop**
+   - Launch from Applications/Start Menu
+
+4. **Wait 10 seconds** for servers to initialize
+
+## Step 7: Verify Installation (2 minutes)
+
+Open Claude Desktop and try these tests:
+
+### Test 1: Memory Cache
+
+```
+Store "hello world" in cache with key "test"
+```
+
+**Expected Response:**
+```
+✓ Successfully cached
+Key: test
+Value: hello world
+```
+
+### Test 2: Goal Agent
+
+```
+Create a goal to test the system
+```
+
+**Expected Response:**
+```
+✓ Created GOAL-0001: Test the system
+Status: planned
+Priority: medium
+```
+
+### Test 3: Cache + Goal Integration
+
+```
+Get the goal I just created from cache
+```
+
+**Expected Response:**
+```
+✓ Retrieved GOAL-0001 from cache
+Description: Test the system
+...
+```
+
+### Test 4: GitHub (if configured)
+
+```
+List my repositories
+```
+
+**Expected Response:**
+```
+✓ Found X repositories
+- repo1 (stars: Y, forks: Z)
+- repo2 ...
+```
+
+### Test 5: Jira (if configured)
+
+```
+Show my Jira projects
+```
+
+**Expected Response:**
+```
+✓ Found X projects
+- PROJ: Project Name
+- ...
+```
+
+## 🎉 Success!
+
+You're now ready to use Claude with MCP servers. Try:
+
+```
+Create a goal to build a REST API with authentication
+```
+
+Claude will:
+1. Create a goal
+2. Cache it automatically
+3. Be ready to break it down into tasks
+
+## 🔍 Troubleshooting
+
+### Servers Not Appearing in Claude
+
+**Symptom:** Claude says "I don't have access to..."
+
+**Solutions:**
 ```bash
-# View logs
+# 1. Check paths are absolute
+grep "servers/" ~/Library/Application\ Support/Claude/claude_desktop_config.json
+# All paths must start with / not ./
+
+# 2. Check Claude Desktop fully restarted
+ps aux | grep Claude  # macOS/Linux
+# Should show process with recent start time
+
+# 3. Check server files exist
+ls -l /path/to/servers/*.py
+# All should be present
+
+# 4. Check logs
 tail -f logs/goal_agent_server.log
-tail -f logs/jira_server.log
-
-# Check if servers are running
-ps aux | grep server.py
+tail -f logs/memory_cache_server.log
+# Look for startup messages or errors
 ```
 
-### Stop Servers
+### Redis Connection Errors
+
+**Symptom:** "Redis connection refused" or "Cache client not initialized"
+
+**Solutions:**
 ```bash
-# Stop all servers
+# 1. Verify Redis is running
+redis-cli ping
+# Should return: PONG
+
+# 2. Check Redis port
+redis-cli -p 6379 ping
+# Change port in .env if needed
+
+# 3. Check Redis logs
+tail -f /usr/local/var/log/redis.log  # macOS
+journalctl -u redis  # Linux
+docker logs redis  # Docker
+```
+
+### Import Errors
+
+**Symptom:** "ModuleNotFoundError: No module named 'mcp'"
+
+**Solutions:**
+```bash
+# 1. Activate virtual environment
+source venv/bin/activate
+
+# 2. Reinstall dependencies
+pip install -r requirements.txt
+
+# 3. Verify installation
+python -c "import mcp; print('OK')"
+
+# 4. Check Python version
+python --version  # Must be 3.10+
+```
+
+### Authentication Errors
+
+**Symptom:** "Authentication failed" for GitHub/Jira
+
+**Solutions:**
+
+**GitHub:**
+```bash
+# 1. Verify token format
+echo $GITHUB_PERSONAL_ACCESS_TOKEN
+# Should start with ghp_ or github_pat_
+
+# 2. Check token scopes
+# Visit: https://github.com/settings/tokens
+# Ensure: repo, workflow checked
+
+# 3. Test token manually
+curl -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
+  https://api.github.com/user
+```
+
+**Jira:**
+```bash
+# 1. Verify credentials
+echo $JIRA_BASE_URL
+echo $JIRA_EMAIL
+# Base URL should not have trailing /
+
+# 2. Test token manually
+curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  "$JIRA_BASE_URL/rest/api/3/myself"
+```
+
+### Server Logs Show Errors
+
+**Check logs:**
+```bash
+# View all errors
+grep -i error logs/*.log
+
+# View specific server
+tail -f logs/goal_agent_server.log
+
+# Check for startup issues
+head -20 logs/memory_cache_server.log
+```
+
+**Common fixes:**
+- Configuration errors → Check .env file
+- Port conflicts → Change ports in config
+- Permission errors → Check file permissions
+
+## 📊 What's Running
+
+After setup, you should have:
+
+```bash
+# Check processes
+ps aux | grep "server.py"
+
+# Expected output:
+python servers/memory_cache_server.py
+python servers/goal_agent_server.py
+# Plus any optional servers (github, jira, etc.)
+
+# Check Redis
+redis-cli info clients
+# Should show connected_clients > 0
+```
+
+## 🚀 Next Steps
+
+Now that everything is working:
+
+1. **Read the full documentation**
+   - [README.md](README.md) - System architecture
+   - [CONFIGURATION.md](CONFIGURATION.md) - Advanced config
+   - [README_GOAL_AGENT.md](README_GOAL_AGENT.md) - API reference
+
+2. **Try real examples**
+   ```
+   Create a goal to add OAuth authentication to our API
+   Break it down into 7 tasks
+   Show me the execution plan
+   Create a GitHub branch for task 1
+   ```
+
+3. **Explore integrations**
+   - Set up GitHub for code management
+   - Connect Jira for ticket tracking
+   - Add Frappe if you use ERPNext
+
+4. **Customize configuration**
+   - Adjust connection pool sizes
+   - Configure rate limiting
+   - Tune cache TTLs
+
+## 💡 Pro Tips
+
+1. **Use absolute paths everywhere** in claude_desktop_config.json
+2. **Always fully restart Claude Desktop** after config changes
+3. **Check logs first** when troubleshooting
+4. **Start minimal** (cache + goal agent only) then add integrations
+5. **Test Redis separately** before blaming MCP servers
+
+## 📝 Useful Commands
+
+```bash
+# Check if Redis is running
+redis-cli ping
+
+# View server processes
+ps aux | grep server.py
+
+# View logs in real-time
+tail -f logs/*.log
+
+# Stop all servers (if needed)
 python scripts/stop_all_servers.py
 
-# Or manually
-pkill -f goal_agent_server.py
-pkill -f jira_server.py
+# Restart Redis (if needed)
+brew services restart redis  # macOS
+sudo systemctl restart redis  # Linux
+docker restart redis  # Docker
+
+# Clear Redis cache (fresh start)
+redis-cli FLUSHDB
+
+# Test configuration
+python scripts/start_all_servers.py
 ```
 
-### Troubleshooting
+## 🆘 Getting Help
 
-**Problem**: "Jira client not initialized"
-```bash
-# Check your .env file has correct values
-cat .env | grep JIRA
+If you're still stuck:
 
-# Test Jira connection manually
-python -c "
-import os
-from dotenv import load_dotenv
-load_dotenv()
-print('URL:', os.getenv('JIRA_BASE_URL'))
-print('Email:', os.getenv('JIRA_EMAIL'))
-print('Token:', 'Set' if os.getenv('JIRA_API_TOKEN') else 'Not set')
-"
-```
+1. Check the [troubleshooting section](#-troubleshooting) above
+2. Review logs: `tail -f logs/*.log`
+3. Verify Redis: `redis-cli ping`
+4. Check config: `cat claude_desktop_config.json`
+5. Test Python environment: `python -c "import mcp; print('OK')"`
 
-**Problem**: "GitHub client not initialized"
-```bash
-# Verify token
-python -c "
-import os
-from dotenv import load_dotenv
-load_dotenv()
-print('Token:', 'Set' if os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN') else 'Not set')
-"
-```
-
-**Problem**: Servers not appearing in Claude
-1. Check Claude Desktop config file path
-2. Restart Claude Desktop completely
-3. Check server logs for errors
-4. Verify full absolute paths in config
-
-## Next Steps
-
-- Read [README_GOAL_AGENT.md](README_GOAL_AGENT.md) for detailed usage
-- Try the example workflows
-- Customize task types for your workflow
-- Integrate with your CI/CD pipeline
-
-## Support
-
-For issues:
-1. Check server logs in `logs/` directory
-2. Verify environment variables
-3. Test each server individually
-4. Check Claude Desktop configuration
-
-Happy goal crushing! 🎯
+Most issues are due to:
+- Relative paths instead of absolute paths
+- Claude Desktop not fully restarted
+- Redis not running
+- Missing environment variables
