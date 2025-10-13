@@ -1,0 +1,65 @@
+{{- if .Values.servers.jira.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jira-server
+  namespace: {{ .Values.namespace.name }}
+spec:
+  replicas: {{ .Values.servers.jira.replicas }}
+  selector:
+    matchLabels:
+      app: jira-server
+  template:
+    metadata:
+      labels:
+        app: jira-server
+    spec:
+      containers:
+      - name: jira-server
+        image: {{ .Values.global.imageRegistry }}/jira:{{ .Values.global.imageTag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 8004
+          name: http
+        env:
+        - name: JIRA_BASE_URL
+          value: {{ .Values.servers.jira.env.JIRA_BASE_URL | quote }}
+        - name: JIRA_EMAIL
+          value: {{ .Values.servers.jira.env.JIRA_EMAIL | quote }}
+        - name: JIRA_PROJECT_KEY
+          value: {{ .Values.servers.jira.env.JIRA_PROJECT_KEY | quote }}
+        - name: JIRA_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: jira-token
+        resources:
+          {{- toYaml .Values.servers.jira.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8004
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8004
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jira-service
+  namespace: {{ .Values.namespace.name }}
+spec:
+  type: {{ .Values.servers.jira.service.type }}
+  selector:
+    app: jira-server
+  ports:
+  - port: {{ .Values.servers.jira.service.port }}
+    targetPort: 8004
+    protocol: TCP
+{{- end }}
+
