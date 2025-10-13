@@ -158,13 +158,26 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ap-south-1
+
+      - name: Check if EKS cluster exists
+        id: check-cluster
+        run: |
+          if aws eks describe-cluster --name mcp-servers-staging --region ap-south-1 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️  EKS cluster 'mcp-servers-staging' does not exist yet"
+            echo "Run Terraform first: cd cloud/terraform && terraform apply"
+          fi
 
       - name: Update kubeconfig
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
-          aws eks update-kubeconfig --name mcp-servers-staging --region us-east-1
+          aws eks update-kubeconfig --name mcp-servers-staging --region ap-south-1
 
       - name: Deploy with Helm
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
           helm upgrade --install mcp-servers ./cloud/helm/mcp-servers \
             --namespace mcp-servers \
@@ -191,13 +204,27 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ap-south-1
+
+      - name: Check if EKS cluster exists
+        id: check-cluster
+        run: |
+          if aws eks describe-cluster --name mcp-servers-production --region ap-south-1 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️  EKS cluster 'mcp-servers-production' does not exist yet"
+            echo "📚 See documentation: https://github.com/souravs72/claude-mcp-setup/blob/main/cloud/SETUP_INSTRUCTIONS.md"
+            echo "🚀 Deploy infrastructure first with Terraform"
+          fi
 
       - name: Update kubeconfig
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
-          aws eks update-kubeconfig --name mcp-servers-production --region us-east-1
+          aws eks update-kubeconfig --name mcp-servers-production --region ap-south-1
 
       - name: Deploy with Helm
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
           helm upgrade --install mcp-servers ./cloud/helm/mcp-servers \
             --namespace mcp-servers \
@@ -211,6 +238,7 @@ jobs:
             --timeout 10m
 
       - name: Verify deployment
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
           kubectl rollout status deployment/memory-cache-server -n mcp-servers
           kubectl rollout status deployment/goal-agent-server -n mcp-servers
@@ -219,6 +247,7 @@ jobs:
           kubectl rollout status deployment/internet-server -n mcp-servers
 
       - name: Run smoke tests
+        if: steps.check-cluster.outputs.exists == 'true'
         run: |
           kubectl run smoke-test --rm -i --restart=Never \
             --image=curlimages/curl:latest -- \
