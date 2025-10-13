@@ -257,10 +257,11 @@ resource "aws_elasticache_subnet_group" "redis" {
   subnet_ids = module.vpc.private_subnets
 }
 
-# Random password for database
+# Random password for database (exclude invalid chars for RDS: / @ " space)
 resource "random_password" "db_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 # Kubernetes provider
