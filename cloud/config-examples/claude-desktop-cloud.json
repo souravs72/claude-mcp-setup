@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "memory-cache": {
+      "command": "python",
+      "args": [
+        "/home/clapgrow/Desktop/claude-mcp-setup/cloud/mcp-http-proxy.py",
+        "https://memory-cache.frappewizard.com"
+      ],
+      "env": {}
+    },
+    "goal-agent": {
+      "command": "python",
+      "args": [
+        "/home/clapgrow/Desktop/claude-mcp-setup/cloud/mcp-http-proxy.py",
+        "https://goal-agent.frappewizard.com"
+      ],
+      "env": {}
+    },
+    "github": {
+      "command": "python",
+      "args": [
+        "/home/clapgrow/Desktop/claude-mcp-setup/cloud/mcp-http-proxy.py",
+        "https://github-service.frappewizard.com"
+      ],
+      "env": {}
+    },
+    "jira": {
+      "command": "python",
+      "args": [
+        "/home/clapgrow/Desktop/claude-mcp-setup/cloud/mcp-http-proxy.py",
+        "https://jira-service.frappewizard.com"
+      ],
+      "env": {}
+    },
+    "internet": {
+      "command": "python",
+      "args": [
+        "/home/clapgrow/Desktop/claude-mcp-setup/cloud/mcp-http-proxy.py",
+        "https://internet-service.frappewizard.com"
+      ],
+      "env": {}
+    }
+  }
+}
+

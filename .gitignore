@@ -1,28 +1,74 @@
-# Environment variables
-.env
+# Secrets and credentials
+*.env
+*.env.*
+!*.env.example
+config/mcp_settings.json
+.aws/
+secrets.yaml
+terraform.tfvars
+!terraform.tfvars.example
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 mcp-env/
-data/
 
-# Logs and PIDs
+# Logs
+*.log
 logs/
-pids/*.pid
+pip-log.txt
+pip-delete-this-directory.txt
 
-# IDE
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# IDEs
 .vscode/
 .idea/
-
-# OS
+*.swp
+*.swo
+*.swn
 .DS_Store
-Thumbs.db
-claude-desktop-debian/
-claude-desktop-debian/*
-config/mcp_settings.json
-mcp_servers.egg-info/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.bak
+~*

@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "memory-cache": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/cloud/mcp-http-proxy.py",
+        "http://a1234567890abcdef.us-east-1.elb.amazonaws.com:8001"
+      ],
+      "env": {}
+    },
+    "goal-agent": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/cloud/mcp-http-proxy.py",
+        "http://a1234567890abcdef.us-east-1.elb.amazonaws.com:8002"
+      ],
+      "env": {}
+    },
+    "github": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/cloud/mcp-http-proxy.py",
+        "http://a1234567890abcdef.us-east-1.elb.amazonaws.com:8003"
+      ],
+      "env": {}
+    },
+    "jira": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/cloud/mcp-http-proxy.py",
+        "http://a1234567890abcdef.us-east-1.elb.amazonaws.com:8004"
+      ],
+      "env": {}
+    },
+    "internet": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/cloud/mcp-http-proxy.py",
+        "http://a1234567890abcdef.us-east-1.elb.amazonaws.com:8005"
+      ],
+      "env": {}
+    }
+  }
+}
+

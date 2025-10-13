@@ -5,6 +5,28 @@ Enterprise-grade Model Context Protocol servers extending Claude with GitHub, Ji
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-1.0+-green.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Cloud Ready](https://img.shields.io/badge/cloud-ready-success.svg)](cloud/QUICK_START.md)
+
+---
+
+## 🚀 NEW: Cloud-Native Deployment Available!
+
+**Deploy to AWS/GCP/Azure in 30 minutes** with production-grade infrastructure:
+
+```bash
+cd cloud && ./deploy.sh production aws
+```
+
+✅ Kubernetes + Helm  
+✅ Terraform IaC  
+✅ Auto-scaling  
+✅ Managed databases  
+✅ CI/CD pipelines  
+✅ 99.9% uptime
+
+👉 **[Quick Start Guide](cloud/QUICK_START.md)** | **[Full Cloud Guide](cloud/CLOUD_DEPLOYMENT_GUIDE.md)** | **[Cloud README](README_CLOUD.md)**
+
+---
 
 ## 🎯 What This Does
 
