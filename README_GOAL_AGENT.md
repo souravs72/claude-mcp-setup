@@ -1,6 +1,24 @@
 # Goal Agent Server - Complete API Reference
 
-Intelligent task orchestration layer for Claude with automatic dependency resolution, execution planning, and persistent state management via Redis.
+Intelligent task orchestration layer for Claude with automatic dependency resolution, execution planning, and persistent state management via PostgreSQL.
+
+---
+
+## 📑 Table of Contents
+
+1. [System Overview](#system-overview)
+2. [Core Data Models](#core-data-models)
+3. [API Reference](#api-reference)
+   - [Goal Operations](#goal-operations)
+   - [Task Operations](#task-operations)
+   - [Batch Operations](#batch-operations)
+   - [Search & Query](#search--query)
+4. [Architecture](#architecture)
+5. [Performance](#performance)
+6. [Best Practices](#best-practices)
+7. [Error Handling](#error-handling)
+
+---
 
 ## System Overview
 
