@@ -54,10 +54,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.server }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
+            type=ref,event=pr,prefix=pr-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha
 
       - name: Build and push server image
         uses: docker/build-push-action@v5
