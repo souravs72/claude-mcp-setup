@@ -148,7 +148,7 @@ module "eks" {
 resource "aws_db_instance" "mcp_postgres" {
   identifier           = "${var.cluster_name}-postgres"
   engine               = "postgres"
-  engine_version       = "15.4"
+  engine_version       = "15"  # Use latest 15.x available in region
   instance_class       = "db.t3.medium"
   allocated_storage    = 20
   storage_type         = "gp3"
@@ -288,23 +288,24 @@ provider "helm" {
   }
 }
 
-# Kubernetes secrets
-resource "kubernetes_secret" "mcp_secrets" {
-  metadata {
-    name      = "mcp-secrets"
-    namespace = "mcp-servers"
-  }
-
-  data = {
-    GITHUB_PERSONAL_ACCESS_TOKEN = var.github_token
-    JIRA_API_TOKEN              = var.jira_api_token
-    GOOGLE_API_KEY              = var.google_api_key
-    GOOGLE_SEARCH_ENGINE_ID     = var.google_search_engine_id
-    POSTGRES_PASSWORD           = random_password.db_password.result
-  }
-
-  type = "Opaque"
-}
+# Kubernetes secrets (created after cluster is ready)
+# Uncomment after EKS cluster is fully provisioned and nodes are ready
+# resource "kubernetes_secret" "mcp_secrets" {
+#   metadata {
+#     name      = "mcp-secrets"
+#     namespace = "mcp-servers"
+#   }
+#
+#   data = {
+#     GITHUB_PERSONAL_ACCESS_TOKEN = var.github_token
+#     JIRA_API_TOKEN              = var.jira_api_token
+#     GOOGLE_API_KEY              = var.google_api_key
+#     GOOGLE_SEARCH_ENGINE_ID     = var.google_search_engine_id
+#     POSTGRES_PASSWORD           = random_password.db_password.result
+#   }
+#
+#   type = "Opaque"
+# }
 
 # Outputs
 output "cluster_endpoint" {
