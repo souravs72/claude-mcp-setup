@@ -59,17 +59,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix={{branch}}-
 
-      - name: Build base image (if needed)
-        if: matrix.server == 'memory-cache'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./cloud/docker/Dockerfile.base
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/base:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Build and push server image
         uses: docker/build-push-action@v5
         with:

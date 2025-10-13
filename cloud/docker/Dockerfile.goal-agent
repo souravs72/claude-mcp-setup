@@ -1,8 +1,22 @@
-FROM mcp-servers/base:latest
+FROM python:3.10-slim
 
-# Copy specific requirements
-COPY requirements/goal_agent_requirements.txt /app/requirements/
-RUN pip install --no-cache-dir -r requirements/goal_agent_requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+# Copy requirements
+COPY requirements/common.txt requirements/goal_agent_requirements.txt /app/requirements/
+RUN pip install --no-cache-dir -r requirements/common.txt -r requirements/goal_agent_requirements.txt
+
+# Copy shared modules
+COPY servers/__init__.py servers/base_client.py servers/config.py servers/logging_config.py /app/servers/
 
 # Copy database module
 COPY servers/database.py /app/servers/
@@ -10,8 +24,12 @@ COPY servers/database.py /app/servers/
 # Copy server code
 COPY servers/goal_agent_server.py /app/servers/
 
+# Copy init script
+COPY scripts/init_database.py /app/scripts/
+
 # Create data directory
-RUN mkdir -p /app/data/goals && chown appuser:appuser /app/data/goals
+RUN mkdir -p /app/data/goals && chown -R appuser:appuser /app
+USER appuser
 
 # Expose port
 EXPOSE 8002
@@ -23,6 +41,10 @@ ENV POSTGRES_PORT=5432
 ENV POSTGRES_DB=mcp_goals
 ENV POSTGRES_USER=postgres
 ENV GOAL_AGENT_MAX_WORKERS=10
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8002/health || exit 1
 
 # Run database migrations on startup, then server
 CMD python scripts/init_database.py && \
