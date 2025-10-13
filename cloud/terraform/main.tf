@@ -19,11 +19,13 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "mcp-terraform-state"
-    key    = "mcp-servers/terraform.tfstate"
-    region = "us-east-1"
-  }
+  # Using local backend for initial setup
+  # To use S3 backend, create bucket first and uncomment:
+  # backend "s3" {
+  #   bucket = "mcp-terraform-state-souravs72"
+  #   key    = "mcp-servers/terraform.tfstate"
+  #   region = "ap-south-1"
+  # }
 }
 
 # Variables
