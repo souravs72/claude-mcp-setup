@@ -171,7 +171,7 @@ Update paths and URLs, then restart Claude Desktop.
 | **GitHub**      | souravs72/claude-mcp-setup    |
 | **Domain**      | frappewizard.com              |
 | **AWS Region**  | ap-south-1 (Mumbai)           |
-| **AWS Account** | 333428666599                  |
+| **AWS Account** | From local AWS config         |
 | **Jira**        | clapgrow.atlassian.net (CGV2) |
 
 ## 💰 Expected Costs

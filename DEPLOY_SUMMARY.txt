@@ -6,7 +6,7 @@ Your Setup:
   📦 Repository: souravs72/claude-mcp-setup
   🌐 Domain: frappewizard.com
   ☁️  AWS Region: ap-south-1 (Mumbai, India)
-  🏢 AWS Account: 333428666599
+  🏢 AWS Account: Configured from local credentials
   ✅ All secrets: Secure (read from local config)
   ✅ Security: GitHub push protection enabled
 

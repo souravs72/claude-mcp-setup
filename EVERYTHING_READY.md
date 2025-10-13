@@ -21,7 +21,7 @@ All checks passed successfully:
 - ✅ GitHub repo: souravs72/claude-mcp-setup
 - ✅ Domain: frappewizard.com
 - ✅ AWS region: ap-south-1 (Mumbai)
-- ✅ AWS account: 333428666599
+- ✅ AWS account: Configured from local credentials
 - ✅ All paths updated
 - ✅ All endpoints configured
 

@@ -28,7 +28,7 @@ cloud/
 | **GitHub Repo**   | souravs72/claude-mcp-setup    |
 | **Domain**        | frappewizard.com              |
 | **AWS Region**    | ap-south-1 (Mumbai, India)    |
-| **AWS Account**   | 333428666599                  |
+| **AWS Account**   | From local AWS config         |
 | **Jira Instance** | clapgrow.atlassian.net (CGV2) |
 | **Email**         | sourav@clapgrow.com           |
 
