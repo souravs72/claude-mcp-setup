@@ -19,11 +19,13 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "mcp-terraform-state"
-    key    = "mcp-servers/terraform.tfstate"
-    region = "us-east-1"
-  }
+  # Using local backend for initial setup
+  # To use S3 backend, create bucket first and uncomment:
+  # backend "s3" {
+  #   bucket = "mcp-terraform-state-souravs72"
+  #   key    = "mcp-servers/terraform.tfstate"
+  #   region = "ap-south-1"
+  # }
 }
 
 # Variables
@@ -146,7 +148,7 @@ module "eks" {
 resource "aws_db_instance" "mcp_postgres" {
   identifier           = "${var.cluster_name}-postgres"
   engine               = "postgres"
-  engine_version       = "15.4"
+  engine_version       = "15"  # Use latest 15.x available in region
   instance_class       = "db.t3.medium"
   allocated_storage    = 20
   storage_type         = "gp3"
@@ -255,10 +257,11 @@ resource "aws_elasticache_subnet_group" "redis" {
   subnet_ids = module.vpc.private_subnets
 }
 
-# Random password for database
+# Random password for database (exclude invalid chars for RDS: / @ " space)
 resource "random_password" "db_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 # Kubernetes provider
@@ -286,23 +289,24 @@ provider "helm" {
   }
 }
 
-# Kubernetes secrets
-resource "kubernetes_secret" "mcp_secrets" {
-  metadata {
-    name      = "mcp-secrets"
-    namespace = "mcp-servers"
-  }
-
-  data = {
-    GITHUB_PERSONAL_ACCESS_TOKEN = var.github_token
-    JIRA_API_TOKEN              = var.jira_api_token
-    GOOGLE_API_KEY              = var.google_api_key
-    GOOGLE_SEARCH_ENGINE_ID     = var.google_search_engine_id
-    POSTGRES_PASSWORD           = random_password.db_password.result
-  }
-
-  type = "Opaque"
-}
+# Kubernetes secrets (created after cluster is ready)
+# Uncomment after EKS cluster is fully provisioned and nodes are ready
+# resource "kubernetes_secret" "mcp_secrets" {
+#   metadata {
+#     name      = "mcp-secrets"
+#     namespace = "mcp-servers"
+#   }
+#
+#   data = {
+#     GITHUB_PERSONAL_ACCESS_TOKEN = var.github_token
+#     JIRA_API_TOKEN              = var.jira_api_token
+#     GOOGLE_API_KEY              = var.google_api_key
+#     GOOGLE_SEARCH_ENGINE_ID     = var.google_search_engine_id
+#     POSTGRES_PASSWORD           = random_password.db_password.result
+#   }
+#
+#   type = "Opaque"
+# }
 
 # Outputs
 output "cluster_endpoint" {
