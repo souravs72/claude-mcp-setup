@@ -1,17 +1,39 @@
-FROM mcp-servers/base:latest
+FROM python:3.10-slim
 
-# Copy specific requirements
-COPY requirements/jira_requirements.txt /app/requirements/
-RUN pip install --no-cache-dir -r requirements/jira_requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+# Copy requirements
+COPY requirements/common.txt requirements/jira_requirements.txt /app/requirements/
+RUN pip install --no-cache-dir -r requirements/common.txt -r requirements/jira_requirements.txt
+
+# Copy shared modules
+COPY servers/__init__.py servers/base_client.py servers/config.py servers/logging_config.py /app/servers/
 
 # Copy server code
 COPY servers/jira_server.py /app/servers/
+
+# Change ownership
+RUN chown -R appuser:appuser /app
+USER appuser
 
 # Expose port
 EXPOSE 8004
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8004/health || exit 1
 
 # Run server
 CMD ["python", "-m", "uvicorn", "servers.jira_server:app", "--host", "0.0.0.0", "--port", "8004"]
