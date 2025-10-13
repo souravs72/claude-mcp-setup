@@ -88,14 +88,14 @@ sequenceDiagram
     participant GoalAgent
     participant PostgreSQL
     participant GitHub
-    
+
     User->>Claude: "Create a goal to add OAuth to the API"
     Claude->>GoalAgent: create_goal(title, description)
     GoalAgent->>PostgreSQL: INSERT goal
     PostgreSQL-->>GoalAgent: GOAL-001 created
     GoalAgent-->>Claude: {goal_id, created_at, status}
     Claude-->>User: "Created GOAL-001 with 5 tasks"
-    
+
     User->>Claude: "Start task 1"
     Claude->>GoalAgent: update_task(task_id, status="in_progress")
     GoalAgent->>GitHub: create_branch("feat/oauth")
@@ -178,7 +178,7 @@ open http://localhost:8000
 
 ```python
 # Claude can do this naturally:
-"Create a goal to refactor the authentication system with 3 tasks: 
+"Create a goal to refactor the authentication system with 3 tasks:
 1) audit current code, 2) design new system, 3) implement OAuth2"
 
 # Automatically creates:
@@ -204,9 +204,9 @@ open http://localhost:8000
 
 ```bash
 # Single conversation can span multiple platforms:
-"Create a Jira ticket for this bug, 
-create a GitHub branch, 
-fix the code, 
+"Create a Jira ticket for this bug,
+create a GitHub branch,
+fix the code,
 create a PR,
 and link the Jira ticket to the PR"
 
@@ -253,15 +253,15 @@ http://localhost:8000
 
 ## 🔧 Server Components
 
-| Server | Purpose | Persistent Storage | Key Features |
-|--------|---------|-------------------|--------------|
-| **Goal Agent** | Task orchestration | PostgreSQL | Goals, tasks, tags, search, dependencies |
-| **GitHub** | Code management | None | Repos, branches, PRs, files, issues |
-| **Jira** | Issue tracking | None | Issues, sprints, projects, workflows |
-| **Internet** | Web access | None | Google search, fetch, batch operations |
-| **Memory Cache** | Performance | Redis | KV store, TTL, scan, transactions |
-| **Frappe** | ERP integration | None | DocTypes, CRUD, filters |
-| **Dashboard** | Monitoring | None | WebSocket, health checks, UI |
+| Server           | Purpose            | Persistent Storage | Key Features                             |
+| ---------------- | ------------------ | ------------------ | ---------------------------------------- |
+| **Goal Agent**   | Task orchestration | PostgreSQL         | Goals, tasks, tags, search, dependencies |
+| **GitHub**       | Code management    | None               | Repos, branches, PRs, files, issues      |
+| **Jira**         | Issue tracking     | None               | Issues, sprints, projects, workflows     |
+| **Internet**     | Web access         | None               | Google search, fetch, batch operations   |
+| **Memory Cache** | Performance        | Redis              | KV store, TTL, scan, transactions        |
+| **Frappe**       | ERP integration    | None               | DocTypes, CRUD, filters                  |
+| **Dashboard**    | Monitoring         | None               | WebSocket, health checks, UI             |
 
 ---
 
@@ -328,6 +328,7 @@ docker-compose down
 ### System Requirements
 
 **Minimum:**
+
 - 2 CPU cores
 - 4 GB RAM
 - 10 GB storage
@@ -335,6 +336,7 @@ docker-compose down
 - Redis 5.0+ (optional)
 
 **Recommended:**
+
 - 4+ CPU cores
 - 8+ GB RAM
 - 20+ GB storage

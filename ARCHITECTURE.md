@@ -22,7 +22,7 @@ Technical documentation for MCP Servers infrastructure, including design decisio
 
 The MCP Servers system follows a **microservices architecture** with each server handling a specific domain (GitHub, Jira, Goals, etc.) and communicating via the Model Context Protocol (MCP).
 
-###  High-Level Architecture
+### High-Level Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -68,6 +68,7 @@ The MCP Servers system follows a **microservices architecture** with each server
 **Purpose**: Task orchestration and persistent storage
 
 **Tech Stack**:
+
 - FastAPI for internal APIs
 - PostgreSQL for data persistence
 - psycopg2 for database connections
@@ -125,6 +126,7 @@ The MCP Servers system follows a **microservices architecture** with each server
 ```
 
 **Key Features**:
+
 - Connection pooling (reduces overhead by 40%)
 - Prepared statements (prevents SQL injection)
 - Transaction management (ACID compliance)
@@ -136,6 +138,7 @@ The MCP Servers system follows a **microservices architecture** with each server
 **Purpose**: Real-time monitoring and visualization
 
 **Tech Stack**:
+
 - FastAPI for HTTP/SSE endpoints
 - Server-Sent Events (SSE) for real-time updates
 - Static file serving for UI
@@ -283,7 +286,7 @@ CREATE TABLE goals (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB DEFAULT '{}'::jsonb,
-    
+
     CONSTRAINT valid_status CHECK (
         status IN ('pending', 'in_progress', 'completed', 'cancelled')
     )
@@ -307,7 +310,7 @@ CREATE TABLE tasks (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB DEFAULT '{}'::jsonb,
-    
+
     CONSTRAINT valid_status CHECK (
         status IN ('pending', 'in_progress', 'completed', 'cancelled')
     )
@@ -452,23 +455,23 @@ async def stream_events(request: Request):
                 # Check if client disconnected
                 if await request.is_disconnected():
                     break
-                
+
                 # Get latest data
                 data = {
                     "goals": await get_goals_summary(),
                     "servers": await get_server_status(),
                     "timestamp": datetime.now().isoformat()
                 }
-                
+
                 # Send as SSE event
                 yield f"data: {json.dumps(data)}\n\n"
-                
+
                 # Poll interval (5 seconds)
                 await asyncio.sleep(5)
-                
+
         except Exception as e:
             logger.error(f"SSE error: {e}")
-            
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -484,7 +487,7 @@ async def stream_events(request: Request):
 
 ```javascript
 // Connect to SSE endpoint
-const eventSource = new EventSource('/events');
+const eventSource = new EventSource("/events");
 
 // Handle incoming events
 eventSource.onmessage = (event) => {
@@ -494,12 +497,12 @@ eventSource.onmessage = (event) => {
 
 // Handle connection errors
 eventSource.onerror = (error) => {
-  console.error('SSE error:', error);
+  console.error("SSE error:", error);
   // Auto-reconnect happens automatically
 };
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', () => {
+window.addEventListener("beforeunload", () => {
   eventSource.close();
 });
 ```
@@ -542,17 +545,17 @@ async def get_goal(goal_id: str):
     cached = redis_client.get(f"goal:{goal_id}")
     if cached:
         return json.loads(cached)
-    
+
     # Cache miss - fetch from database
     goal = await db.fetch_goal(goal_id)
-    
+
     # Store in cache (5-minute TTL)
     redis_client.setex(
         f"goal:{goal_id}",
         300,  # 5 minutes
         json.dumps(goal)
     )
-    
+
     return goal
 
 # Performance impact:
@@ -622,13 +625,13 @@ goal, tasks, tags = await asyncio.gather(
 
 ### Performance Summary
 
-| Optimization | Before | After | Improvement |
-|--------------|--------|-------|-------------|
-| Connection Pooling | 50ms | 10ms | 80% faster |
-| Redis Caching | 10ms | 1-2ms | 80-90% faster |
-| Query Indexes | 500ms | 5ms | 99% faster |
-| Batch Operations | 100ms | 15ms | 85% faster |
-| Async I/O | 60ms | 20ms | 67% faster |
+| Optimization       | Before | After | Improvement   |
+| ------------------ | ------ | ----- | ------------- |
+| Connection Pooling | 50ms   | 10ms  | 80% faster    |
+| Redis Caching      | 10ms   | 1-2ms | 80-90% faster |
+| Query Indexes      | 500ms  | 5ms   | 99% faster    |
+| Batch Operations   | 100ms  | 15ms  | 85% faster    |
+| Async I/O          | 60ms   | 20ms  | 67% faster    |
 
 **Overall Impact**: ~100ms latency for typical dashboard page load.
 
@@ -661,10 +664,10 @@ Request
 async def update_goal(goal_id: str, data: dict):
     # 1. Update database
     await db.update_goal(goal_id, data)
-    
+
     # 2. Invalidate cache
     redis_client.delete(f"goal:{goal_id}")
-    
+
     # 3. Optional: Refresh cache immediately
     fresh_data = await db.fetch_goal(goal_id)
     redis_client.setex(f"goal:{goal_id}", 300, json.dumps(fresh_data))
@@ -731,14 +734,14 @@ class CircuitBreaker:
         self.failures = 0
         self.last_failure_time = None
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
-    
+
     async def call(self, func):
         if self.state == "OPEN":
             if time.time() - self.last_failure_time > self.timeout:
                 self.state = "HALF_OPEN"
             else:
                 raise CircuitBreakerOpen("Service unavailable")
-        
+
         try:
             result = await func()
             if self.state == "HALF_OPEN":
@@ -776,7 +779,7 @@ from pydantic import BaseModel, validator
 class GoalCreate(BaseModel):
     title: str
     description: str
-    
+
     @validator('title')
     def title_must_not_be_empty(cls, v):
         if not v or not v.strip():
@@ -882,11 +885,13 @@ ENABLE_METRICS=true
 ### Resource Requirements
 
 **Development**:
+
 - 2 CPU cores
 - 4 GB RAM
 - 10 GB disk
 
 **Production**:
+
 - 4+ CPU cores
 - 8+ GB RAM
 - 50+ GB disk (with backups)
@@ -907,4 +912,3 @@ ENABLE_METRICS=true
 ---
 
 **For implementation questions, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
-
