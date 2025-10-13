@@ -17,14 +17,15 @@ git clone <your-repo-url>
 cd claude-mcp-setup
 
 # Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install all dependencies
-pip install -r requirements.txt
+# Install all dependencies and CLI tool
+pip install -e .[all]
 
 # Verify installation
 python -c "import mcp, redis, github; print('✓ All packages installed')"
+mcpctl --version  # Should show: mcpctl version 1.0.0
 ```
 
 ## Step 2: Start Redis (1 minute)
@@ -32,6 +33,7 @@ python -c "import mcp, redis, github; print('✓ All packages installed')"
 Redis is required for the Memory Cache server.
 
 ### macOS (Homebrew)
+
 ```bash
 brew install redis
 brew services start redis
@@ -41,6 +43,7 @@ redis-cli ping  # Should return: PONG
 ```
 
 ### Linux (Ubuntu/Debian)
+
 ```bash
 sudo apt update
 sudo apt install redis-server
@@ -52,6 +55,7 @@ redis-cli ping  # Should return: PONG
 ```
 
 ### Docker (All platforms)
+
 ```bash
 docker run -d -p 6379:6379 --name redis redis:alpine
 
@@ -60,6 +64,7 @@ docker exec redis redis-cli ping  # Should return: PONG
 ```
 
 ### Windows
+
 ```bash
 # Download from: https://github.com/microsoftarchive/redis/releases
 # Or use WSL2 with Linux instructions above
@@ -72,7 +77,7 @@ docker exec redis redis-cli ping  # Should return: PONG
 cp .env.example .env
 
 # Edit .env file
-nano .env  # Or use your preferred editor
+nano .env
 ```
 
 ### Minimum Configuration
@@ -129,35 +134,91 @@ FRAPPE_API_SECRET=your_secret
 ## Step 4: Test Configuration (1 minute)
 
 ```bash
-# Run configuration checker
-python scripts/start_all_servers.py
+# NEW: Use mcpctl for validation (recommended)
+mcpctl config       # View detailed configuration
+mcpctl start        # Validate all servers
+mcpctl test         # Run integration tests
 
 # Expected output:
-# ✓ Server Files: 6/6 found
-# ✓ Redis Server: Running
-# ✓ Environment: X/Y variables set
+# ✓ Server Files: All 6 found
+# ✓ Redis: Running
+# ✓ Environment: All variables configured
+```
+
+**Alternative (old method):**
+
+```bash
+python scripts/start_all_servers.py
 ```
 
 If you see errors, check:
-- Redis is running: `redis-cli ping`
+
+- Redis is running: `redis-cli ping` or `mcpctl config`
 - Python version: `python --version` (need 3.10+)
 - Dependencies installed: `pip list | grep mcp`
+- Run: `mcpctl config` for detailed diagnostics
+
+## 🚀 Step 4.5: Start Everything with One Command! (NEW)
+
+**The easiest way to run all servers and dashboard:**
+
+```bash
+mcpctl run
+```
+
+This single command will:
+
+1. ✅ Run pre-flight checks (Redis, files, environment)
+2. 🚀 Start all 6 MCP servers in background
+3. 📊 Launch web dashboard at http://localhost:8000
+4. 🔍 Monitor everything in real-time
+
+**Quick Commands:**
+
+```bash
+mcpctl run                    # Start servers + dashboard (recommended!)
+mcpctl run --dashboard-only   # Only start the dashboard
+mcpctl run --servers-only     # Only start servers (no dashboard)
+
+# Stop everything when done
+mcpctl stop                   # Stop all running servers
+
+# Check what's running
+mcpctl status                 # View server status
+mcpctl logs github            # View specific server logs
+```
+
+**When to use this:**
+
+- ✅ Development & testing
+- ✅ Local monitoring with dashboard
+- ✅ Quick prototyping
+
+**When NOT to use this:**
+
+- ❌ Production with Claude Desktop (servers auto-start via stdio)
+- ❌ CI/CD pipelines (use individual commands)
+
+> **Note:** This is separate from Claude Desktop integration. For Claude Desktop, continue to Step 5 below. The `mcpctl run` command is perfect for testing and local development with the dashboard.
 
 ## Step 5: Configure Claude Desktop (2 minutes)
 
 ### Find Config File
 
 **macOS:**
+
 ```bash
 open ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
 **Linux:**
+
 ```bash
 nano ~/.config/Claude/claude_desktop_config.json
 ```
 
 **Windows:**
+
 ```bash
 notepad %APPDATA%\Claude\claude_desktop_config.json
 ```
@@ -167,6 +228,7 @@ notepad %APPDATA%\Claude\claude_desktop_config.json
 **IMPORTANT:** Use **absolute paths** (not relative).
 
 Get your project path:
+
 ```bash
 pwd  # Copy this output
 ```
@@ -242,25 +304,47 @@ Replace `/absolute/path/to/your/project` with the output from `pwd`:
 **IMPORTANT:** Full restart required (not just refresh)
 
 1. **Quit Claude Desktop completely**
+
    - macOS: Cmd+Q
    - Windows: File → Exit
    - Linux: Close all windows
 
 2. **Verify it's closed**
+
    ```bash
    # macOS/Linux
    ps aux | grep Claude  # Should show nothing
-   
+
    # Windows (PowerShell)
    Get-Process | Where-Object {$_.Name -like "*Claude*"}
    ```
 
 3. **Restart Claude Desktop**
+
    - Launch from Applications/Start Menu
 
 4. **Wait 10 seconds** for servers to initialize
 
 ## Step 7: Verify Installation (2 minutes)
+
+### Command Line Verification
+
+```bash
+# Check if servers are running
+mcpctl status
+
+# View server logs
+mcpctl logs --all
+
+# Run integration tests
+mcpctl test
+
+# Expected:
+# ✓ All servers responding
+# ✓ Tests passing
+```
+
+### Claude Desktop Tests
 
 Open Claude Desktop and try these tests:
 
@@ -271,6 +355,7 @@ Store "hello world" in cache with key "test"
 ```
 
 **Expected Response:**
+
 ```
 ✓ Successfully cached
 Key: test
@@ -284,6 +369,7 @@ Create a goal to test the system
 ```
 
 **Expected Response:**
+
 ```
 ✓ Created GOAL-0001: Test the system
 Status: planned
@@ -297,6 +383,7 @@ Get the goal I just created from cache
 ```
 
 **Expected Response:**
+
 ```
 ✓ Retrieved GOAL-0001 from cache
 Description: Test the system
@@ -310,6 +397,7 @@ List my repositories
 ```
 
 **Expected Response:**
+
 ```
 ✓ Found X repositories
 - repo1 (stars: Y, forks: Z)
@@ -323,6 +411,7 @@ Show my Jira projects
 ```
 
 **Expected Response:**
+
 ```
 ✓ Found X projects
 - PROJ: Project Name
@@ -338,34 +427,57 @@ Create a goal to build a REST API with authentication
 ```
 
 Claude will:
+
 1. Create a goal
 2. Cache it automatically
 3. Be ready to break it down into tasks
 
 ## 🔍 Troubleshooting
 
+### Quick Diagnostics with mcpctl
+
+```bash
+# 1. Check configuration
+mcpctl config      # Shows all settings and env vars
+
+# 2. Validate servers
+mcpctl start       # Checks all prerequisites
+
+# 3. Run tests
+mcpctl test -v     # Detailed test output
+
+# 4. Check status
+mcpctl status -v   # Shows running servers
+
+# 5. View logs
+mcpctl logs --all  # All server logs
+```
+
 ### Servers Not Appearing in Claude
 
 **Symptom:** Claude says "I don't have access to..."
 
 **Solutions:**
+
 ```bash
-# 1. Check paths are absolute
+# 1. Quick check with mcpctl
+mcpctl config      # Verify all paths and env vars
+mcpctl status      # Check if servers are running
+
+# 2. Check paths are absolute
 grep "servers/" ~/Library/Application\ Support/Claude/claude_desktop_config.json
 # All paths must start with / not ./
 
-# 2. Check Claude Desktop fully restarted
+# 3. Check Claude Desktop fully restarted
 ps aux | grep Claude  # macOS/Linux
 # Should show process with recent start time
 
-# 3. Check server files exist
-ls -l /path/to/servers/*.py
-# All should be present
+# 4. Check server files exist
+mcpctl start       # Will show missing files
 
-# 4. Check logs
-tail -f logs/goal_agent_server.log
-tail -f logs/memory_cache_server.log
-# Look for startup messages or errors
+# 5. Check logs
+mcpctl logs github -f     # Follow logs in real-time
+mcpctl logs goal-agent    # View recent logs
 ```
 
 ### Redis Connection Errors
@@ -373,16 +485,23 @@ tail -f logs/memory_cache_server.log
 **Symptom:** "Redis connection refused" or "Cache client not initialized"
 
 **Solutions:**
+
 ```bash
-# 1. Verify Redis is running
+# 1. Quick check with mcpctl
+mcpctl config      # Shows Redis status
+
+# 2. Verify Redis is running
 redis-cli ping
 # Should return: PONG
 
-# 2. Check Redis port
+# 3. Check Redis port
 redis-cli -p 6379 ping
 # Change port in .env if needed
 
-# 3. Check Redis logs
+# 4. View cache server logs
+mcpctl logs memory-cache -f
+
+# 5. Check Redis logs
 tail -f /usr/local/var/log/redis.log  # macOS
 journalctl -u redis  # Linux
 docker logs redis  # Docker
@@ -393,6 +512,7 @@ docker logs redis  # Docker
 **Symptom:** "ModuleNotFoundError: No module named 'mcp'"
 
 **Solutions:**
+
 ```bash
 # 1. Activate virtual environment
 source venv/bin/activate
@@ -414,6 +534,7 @@ python --version  # Must be 3.10+
 **Solutions:**
 
 **GitHub:**
+
 ```bash
 # 1. Verify token format
 echo $GITHUB_PERSONAL_ACCESS_TOKEN
@@ -429,6 +550,7 @@ curl -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
 ```
 
 **Jira:**
+
 ```bash
 # 1. Verify credentials
 echo $JIRA_BASE_URL
@@ -443,6 +565,7 @@ curl -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
 ### Server Logs Show Errors
 
 **Check logs:**
+
 ```bash
 # View all errors
 grep -i error logs/*.log
@@ -455,6 +578,7 @@ head -20 logs/memory_cache_server.log
 ```
 
 **Common fixes:**
+
 - Configuration errors → Check .env file
 - Port conflicts → Change ports in config
 - Permission errors → Check file permissions
@@ -482,11 +606,13 @@ redis-cli info clients
 Now that everything is working:
 
 1. **Read the full documentation**
+
    - [README.md](README.md) - System architecture
    - [CONFIGURATION.md](CONFIGURATION.md) - Advanced config
    - [README_GOAL_AGENT.md](README_GOAL_AGENT.md) - API reference
 
 2. **Try real examples**
+
    ```
    Create a goal to add OAuth authentication to our API
    Break it down into 7 tasks
@@ -495,6 +621,7 @@ Now that everything is working:
    ```
 
 3. **Explore integrations**
+
    - Set up GitHub for code management
    - Connect Jira for ticket tracking
    - Add Frappe if you use ERPNext
@@ -506,26 +633,51 @@ Now that everything is working:
 
 ## 💡 Pro Tips
 
-1. **Use absolute paths everywhere** in claude_desktop_config.json
-2. **Always fully restart Claude Desktop** after config changes
-3. **Check logs first** when troubleshooting
-4. **Start minimal** (cache + goal agent only) then add integrations
-5. **Test Redis separately** before blaming MCP servers
+1. **Use mcpctl for all operations** - faster and more reliable
+2. **Use absolute paths everywhere** in claude_desktop_config.json
+3. **Always fully restart Claude Desktop** after config changes
+4. **Check logs first** when troubleshooting: `mcpctl logs --all`
+5. **Start minimal** (cache + goal agent only) then add integrations
+6. **Test Redis separately** before blaming MCP servers
 
-## 📝 Useful Commands
+## 📝 Essential mcpctl Commands
+
+```bash
+# 🚀 NEW: Single Command Start (Recommended!)
+mcpctl run                    # Start all servers + dashboard
+mcpctl run --dashboard-only   # Only dashboard
+mcpctl run --servers-only     # Only servers
+mcpctl stop                   # Stop everything
+
+# Configuration & Validation
+mcpctl config        # Show all configuration
+mcpctl start         # Validate servers
+mcpctl test          # Run integration tests
+
+# Monitoring & Status
+mcpctl status        # List running servers
+mcpctl status -v     # Detailed view with logs
+
+# Log Management
+mcpctl logs github -f           # Follow GitHub logs
+mcpctl logs memory-cache -n 100 # Last 100 lines
+mcpctl logs --all               # All server logs
+
+# Server Management
+mcpctl dashboard     # Start dashboard only
+mcpctl restart github # Restart specific server
+```
+
+## 📝 Other Useful Commands
 
 ```bash
 # Check if Redis is running
 redis-cli ping
+mcpctl config  # Also shows Redis status
 
 # View server processes
 ps aux | grep server.py
-
-# View logs in real-time
-tail -f logs/*.log
-
-# Stop all servers (if needed)
-python scripts/stop_all_servers.py
+mcpctl status  # Better alternative
 
 # Restart Redis (if needed)
 brew services restart redis  # macOS
@@ -534,23 +686,24 @@ docker restart redis  # Docker
 
 # Clear Redis cache (fresh start)
 redis-cli FLUSHDB
-
-# Test configuration
-python scripts/start_all_servers.py
 ```
 
 ## 🆘 Getting Help
 
 If you're still stuck:
 
-1. Check the [troubleshooting section](#-troubleshooting) above
-2. Review logs: `tail -f logs/*.log`
-3. Verify Redis: `redis-cli ping`
-4. Check config: `cat claude_desktop_config.json`
-5. Test Python environment: `python -c "import mcp; print('OK')"`
+1. Run diagnostics: `mcpctl config` and `mcpctl test -v`
+2. Check the [troubleshooting section](#-troubleshooting) above
+3. Review logs: `mcpctl logs --all`
+4. Verify Redis: `mcpctl config` or `redis-cli ping`
+5. Check config: `cat claude_desktop_config.json`
+6. Test Python environment: `python -c "import mcp; print('OK')"`
 
 Most issues are due to:
+
 - Relative paths instead of absolute paths
 - Claude Desktop not fully restarted
 - Redis not running
 - Missing environment variables
+
+**Use `mcpctl config` as your first diagnostic tool!**

@@ -3,6 +3,7 @@
 Memory Cache MCP Server - Production Ready
 Provides Redis-based caching capabilities with TTL, patterns, and bulk operations
 """
+
 import json
 import sys
 import atexit
@@ -16,8 +17,17 @@ from mcp.server.fastmcp import FastMCP
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
-from servers.config import load_env_file, RedisConfig, validate_config, ConfigurationError
+from servers.logging_config import (
+    setup_logging,
+    log_server_startup,
+    log_server_shutdown,
+)
+from servers.config import (
+    load_env_file,
+    RedisConfig,
+    validate_config,
+    ConfigurationError,
+)
 from servers.base_client import handle_errors, validate_non_empty, validate_positive_int
 
 # Initialize
@@ -35,7 +45,7 @@ class RedisCacheClient:
     def __init__(self, config: RedisConfig) -> None:
         self.config = config
         self._pool: redis.ConnectionPool | None = None
-        self._client: redis.Redis[Any] | None = None
+        self._client: Any = None
 
         # Create connection pool
         self._pool = redis.ConnectionPool(
@@ -64,13 +74,15 @@ class RedisCacheClient:
         try:
             if self._client:
                 self._client.ping()
-                logger.info(f"Connected to Redis at {self.config.host}:{self.config.port}")
+                logger.info(
+                    f"Connected to Redis at {self.config.host}:{self.config.port}"
+                )
         except RedisConnectionError as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
 
     @property
-    def client(self) -> redis.Redis[Any]:
+    def client(self) -> Any:
         """Get Redis client instance."""
         if self._client is None:
             raise RuntimeError("Redis client not initialized")
@@ -268,7 +280,9 @@ class RedisCacheClient:
             logger.error(f"Failed to search keys: {e}")
             raise
 
-    def scan(self, cursor: int = 0, match: str | None = None, count: int = 10) -> dict[str, Any]:
+    def scan(
+        self, cursor: int = 0, match: str | None = None, count: int = 10
+    ) -> dict[str, Any]:
         """
         Incrementally iterate over keys (production-safe).
 
@@ -293,7 +307,11 @@ class RedisCacheClient:
             keys_list = [k.decode() if isinstance(k, bytes) else k for k in keys_result]
             logger.info(f"Scan returned {len(keys_list)} keys")
 
-            return {"cursor": new_cursor, "keys": keys_list, "complete": new_cursor == 0}
+            return {
+                "cursor": new_cursor,
+                "keys": keys_list,
+                "complete": new_cursor == 0,
+            }
 
         except RedisError as e:
             logger.error(f"Failed to scan keys: {e}")

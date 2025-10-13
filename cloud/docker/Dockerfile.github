@@ -1,0 +1,18 @@
+FROM mcp-servers/base:latest
+
+# Copy specific requirements
+COPY requirements/github_requirements.txt /app/requirements/
+RUN pip install --no-cache-dir -r requirements/github_requirements.txt
+
+# Copy server code
+COPY servers/github_server.py /app/servers/
+
+# Expose port
+EXPOSE 8003
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Run server
+CMD ["python", "-m", "uvicorn", "servers.github_server:app", "--host", "0.0.0.0", "--port", "8003"]
+

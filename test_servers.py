@@ -3,6 +3,7 @@
 MCP Server Health Check Script
 Tests all servers for proper initialization and basic functionality
 """
+
 import sys
 from pathlib import Path
 from typing import Tuple, List
@@ -52,7 +53,13 @@ def test_configurations() -> Tuple[bool, List[str]]:
     logger.info("Testing configurations...")
     errors = []
 
-    from servers.config import FrappeConfig, GitHubConfig, JiraConfig, InternetConfig, load_env_file
+    from servers.config import (
+        FrappeConfig,
+        GitHubConfig,
+        JiraConfig,
+        InternetConfig,
+        load_env_file,
+    )
 
     # Load environment
     load_env_file()
@@ -104,7 +111,9 @@ def test_client_initialization() -> Tuple[bool, List[str]]:
             if client is not None:
                 logger.info(f"✓ {display_name} Client: Initialized")
             else:
-                error_msg = f"⚠ {display_name} Client: Not initialized (check configuration)"
+                error_msg = (
+                    f"⚠ {display_name} Client: Not initialized (check configuration)"
+                )
                 logger.warning(error_msg)
                 errors.append(error_msg)
         except Exception as e:
@@ -160,11 +169,15 @@ def test_mcp_tools() -> Tuple[bool, List[str]]:
     errors = []
 
     servers = [
-        ("frappe_server", ["frappe_get_document", "frappe_get_list", "frappe_create_document"]),
+        (
+            "frappe_server",
+            ["frappe_get_document", "frappe_get_list", "frappe_create_document"],
+        ),
         ("github_server", ["list_repositories", "get_file_content", "create_issue"]),
         ("jira_server", ["jira_get_issue", "jira_search_issues", "jira_create_issue"]),
         ("internet_server", ["web_search", "web_fetch"]),
         ("goal_agent_server", ["create_goal", "break_down_goal", "get_next_tasks"]),
+        ("memory_cache_server", ["cache_set", "cache_get", "cache_delete"]),
     ]
 
     for module_name, expected_tools in servers:
@@ -172,18 +185,27 @@ def test_mcp_tools() -> Tuple[bool, List[str]]:
             module = __import__(f"servers.{module_name}", fromlist=["mcp"])
             mcp = getattr(module, "mcp")
 
-            # Check if tools are registered
+            # Check if tools are registered (FastMCP uses _tool_manager._tools)
             registered_tools = []
-            if hasattr(mcp, "_tools"):
+            if hasattr(mcp, "_tool_manager") and hasattr(mcp._tool_manager, "_tools"):
+                registered_tools = list(mcp._tool_manager._tools.keys())
+            elif hasattr(mcp, "_tools"):
+                # Fallback for other MCP implementations
                 registered_tools = list(mcp._tools.keys())
 
-            missing_tools = [tool for tool in expected_tools if tool not in registered_tools]
+            missing_tools = [
+                tool for tool in expected_tools if tool not in registered_tools
+            ]
 
             if not missing_tools:
-                logger.info(f"✓ {module_name}: All tools registered")
+                logger.info(
+                    f"✓ {module_name}: All tools registered ({len(registered_tools)} total)"
+                )
             else:
-                error_msg = f"⚠ {module_name}: Missing tools - {', '.join(missing_tools)}"
-                logger.warning(error_msg)
+                error_msg = (
+                    f"✗ {module_name}: Missing tools - {', '.join(missing_tools)}"
+                )
+                logger.error(error_msg)
                 errors.append(error_msg)
 
         except Exception as e:

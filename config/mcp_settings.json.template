@@ -1,0 +1,51 @@
+{
+  "mcpServers": {
+    "internet-server": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python",
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/internet_server.py"],
+      "env": {
+        "GOOGLE_API_KEY": "your_google_api_key_here",
+        "GOOGLE_SEARCH_ENGINE_ID": "your_search_engine_id_here"
+      }
+    },
+    "github-server": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python", 
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/github_server.py"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
+      }
+    },
+    "frappe-server": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python",
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/frappe_server.py"],
+      "env": {
+        "FRAPPE_SITE_URL": "http://127.0.0.1:8005",
+        "FRAPPE_API_KEY": "your_frappe_api_key", 
+        "FRAPPE_API_SECRET": "your_frappe_api_secret"
+      }
+    },
+    "jira-server": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python",
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/jira_server.py"],
+      "env": {
+        "JIRA_BASE_URL": "https://your-domain.atlassian.net",
+        "JIRA_EMAIL": "your-email@example.com",
+        "JIRA_API_TOKEN": "your_jira_api_token_here",
+        "JIRA_PROJECT_KEY": "YOUR_PROJECT_KEY"
+      }
+    },
+    "goal-agent-server": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python",
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/goal_agent_server.py"]
+    },
+    "memory-cache": {
+      "command": "/home/clapgrow/Desktop/claude-mcp-setup/mcp-env/bin/python",
+      "args": ["/home/clapgrow/Desktop/claude-mcp-setup/servers/memory_cache_server.py"],
+      "env": {
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      }
+    }
+  }
+}
+

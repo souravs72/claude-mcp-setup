@@ -67,13 +67,14 @@ REDIS_DECODE_RESPONSES=true    # Automatically decode bytes to strings
 
 **Technical Details:**
 
-| Parameter | Range | Impact | Default |
-|-----------|-------|--------|---------|
-| `MAX_CONNECTIONS` | 10-500 | Pool size, memory usage | 50 |
-| `SOCKET_TIMEOUT` | 1-30s | Query timeout | 5s |
-| `HEALTH_CHECK_INTERVAL` | 10-300s | Connection validation | 30s |
+| Parameter               | Range   | Impact                  | Default |
+| ----------------------- | ------- | ----------------------- | ------- |
+| `MAX_CONNECTIONS`       | 10-500  | Pool size, memory usage | 50      |
+| `SOCKET_TIMEOUT`        | 1-30s   | Query timeout           | 5s      |
+| `HEALTH_CHECK_INTERVAL` | 10-300s | Connection validation   | 30s     |
 
 **Connection Pool Sizing:**
+
 ```python
 # Formula: connections = workers * concurrent_operations
 # Example: 10 workers * 5 ops = 50 connections
@@ -97,14 +98,15 @@ CACHE_ENABLED=true             # Enable Redis caching
 
 **Worker Sizing Guide:**
 
-| Workload | Workers | Notes |
-|----------|---------|-------|
-| Development | 3-5 | Minimal resource usage |
-| Light | 5-10 | Standard usage |
-| Medium | 10-20 | Multiple concurrent goals |
-| Heavy | 20-50 | Batch operations |
+| Workload    | Workers | Notes                     |
+| ----------- | ------- | ------------------------- |
+| Development | 3-5     | Minimal resource usage    |
+| Light       | 5-10    | Standard usage            |
+| Medium      | 10-20   | Multiple concurrent goals |
+| Heavy       | 20-50   | Batch operations          |
 
 **Performance Impact:**
+
 ```python
 # More workers = more concurrent operations
 # But: Diminishing returns after ~20 workers
@@ -131,12 +133,12 @@ GITHUB_MAX_RETRIES=3           # Retry attempts on failure
 
 **Token Scopes Explained:**
 
-| Scope | Purpose | Required For |
-|-------|---------|--------------|
-| `repo` | Full repository access | Reading/writing code, creating PRs |
-| `workflow` | GitHub Actions | Triggering workflows |
-| `read:org` | Organization access | Private org repositories |
-| `read:user` | User info | Profile information |
+| Scope       | Purpose                | Required For                       |
+| ----------- | ---------------------- | ---------------------------------- |
+| `repo`      | Full repository access | Reading/writing code, creating PRs |
+| `workflow`  | GitHub Actions         | Triggering workflows               |
+| `read:org`  | Organization access    | Private org repositories           |
+| `read:user` | User info              | Profile information                |
 
 **Getting Your Token:**
 
@@ -147,6 +149,7 @@ GITHUB_MAX_RETRIES=3           # Retry attempts on failure
 5. **Save immediately** - you won't see it again!
 
 **Token Format:**
+
 - Classic: `ghp_` followed by 40 characters
 - Fine-grained: `github_pat_` followed by token
 
@@ -175,13 +178,15 @@ JIRA_RATE_LIMIT_DELAY=0.5      # Seconds between requests
 
 **Getting Jira Credentials:**
 
-1. **Base URL:** 
+1. **Base URL:**
+
    ```
    https://[your-domain].atlassian.net
    Example: https://acme-corp.atlassian.net
    ```
 
 2. **API Token:**
+
    - Visit: https://id.atlassian.com/manage-profile/security/api-tokens
    - Click "Create API token"
    - Name it (e.g., "Claude MCP Server")
@@ -220,10 +225,12 @@ GOOGLE_MAX_RETRIES=3           # Retry attempts
 **Setup Instructions:**
 
 1. **Enable Custom Search API:**
+
    - Visit: https://console.cloud.google.com/apis/library/customsearch.googleapis.com
    - Click "Enable"
 
 2. **Get API Key:**
+
    - Visit: https://console.cloud.google.com/apis/credentials
    - Create Credentials → API Key
    - Copy key
@@ -236,10 +243,12 @@ GOOGLE_MAX_RETRIES=3           # Retry attempts
    - Copy Search Engine ID
 
 **Rate Limits (Free Tier):**
+
 - 100 queries per day
 - 10 queries per second
 
 **Paid Tier:**
+
 - $5 per 1,000 queries
 - 10,000 queries per day
 - Visit: https://console.cloud.google.com/billing
@@ -271,6 +280,7 @@ FRAPPE_POOL_MAXSIZE=10         # Max pool size
 5. Store securely in `.env`
 
 **Important:**
+
 - Keep credentials secure - they provide full access
 - Regenerate if compromised
 - Use separate keys for development/production
@@ -341,6 +351,39 @@ DEFAULT_MAX_RETRIES=1          # Fail fast
 # 8-core CPU (Desktop):      GOAL_AGENT_MAX_WORKERS=20
 # 16-core CPU (Server):      GOAL_AGENT_MAX_WORKERS=40
 ```
+
+### 📊 Web Dashboard Configuration
+
+The operations dashboard provides real-time monitoring of your MCP infrastructure.
+
+```bash
+# Dashboard Server (Optional - for monitoring)
+# No configuration required - auto-detects all servers
+# Default port: 8000
+# Auto-refresh: 5 seconds
+
+# To start:
+# ./mcpctl.py dashboard
+# or: python servers/dashboard_server.py
+```
+
+**Features:**
+
+- Server status monitoring (process details, uptime, memory, CPU)
+- Redis cache statistics (keys, memory, ops/sec, hit rate)
+- Active goals and tasks tracking
+- Real-time log aggregation with filtering
+- Environment variable validation
+- REST API endpoints for custom integrations
+
+**No configuration needed** - the dashboard automatically discovers:
+
+- All running MCP servers
+- Redis connection (from existing config)
+- Goals and tasks (from `data/goals/`)
+- Log files (from `logs/`)
+
+**Access:** `http://localhost:8000` after starting with `mcpctl dashboard`
 
 ## Validation
 

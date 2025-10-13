@@ -28,6 +28,10 @@ dependencies = [
     "pydantic>=2.6.0,<2.10.0",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "psutil>=5.9.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
 ]
 
 [project.optional-dependencies]
@@ -62,9 +66,12 @@ jira-server = "servers.jira_server:main"
 internet-server = "servers.internet_server:main"
 goal-agent-server = "servers.goal_agent_server:main"
 cache-server = "servers.memory_cache_server:main"
+dashboard-server = "servers.dashboard_server:main"
+mcpctl = "mcpctl:main"
 
 [tool.setuptools]
 packages = ["servers"]
+py-modules = ["mcpctl"]
 
 [tool.setuptools.package-data]
 servers = ["py.typed"]
