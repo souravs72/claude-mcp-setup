@@ -66,6 +66,12 @@ SERVERS = {
         "log": LOGS_DIR / "jira_server.log",
         "env_vars": ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"],
     },
+    "file-server": {
+        "name": "File System Server",
+        "script": SERVERS_DIR / "file_server.py",
+        "log": LOGS_DIR / "file_server.log",
+        "env_vars": [],
+    },
 }
 
 
