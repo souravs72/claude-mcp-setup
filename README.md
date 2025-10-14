@@ -57,7 +57,7 @@ mcpctl status
 mcpctl goal create "Test Goal" "Testing the system"
 ```
 
-## 📊 GitHub Stats
+## 📊 My GitHub Stats
 
 <div align="center">
 
@@ -69,6 +69,18 @@ mcpctl goal create "Test Goal" "Testing the system"
 
 </div>
 
+## ⭐ Support This Project
+
+If you found this project helpful, please consider:
+
+- ⭐ **Star this repository** if you like it
+- 👀 **Watch** for updates and new features
+- 🍴 **Fork** to contribute your own improvements
+- 🐛 **Report issues** to help us improve
+- 💬 **Share** with others who might benefit
+
+Your support helps us continue developing and maintaining this project!
+
 ## 🤝 Contributing
 
 Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
@@ -78,3 +90,5 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
+
+**Made with ❤️ for the Claude AI community**
