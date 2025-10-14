@@ -90,5 +90,3 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
-
-**Made with ❤️ for the Claude AI community**
