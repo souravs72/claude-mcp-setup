@@ -628,18 +628,22 @@ def read_file(file_path: str, encoding: str = "utf-8") -> str:
                 path_validation["error"], "read", file_path
             )
             return safe_json_dumps(error_response)
-        
+
         validate_non_empty(file_path, "file_path")
         result = file_client.read_file(file_path, encoding)
         return safe_json_dumps(error_handler.create_success_response(result))
-        
+
     except FileNotFoundError as e:
         logger.error(f"File not found in read_file: {e}")
-        error_response = error_handler.handle_file_operation_error(str(e), "read", file_path)
+        error_response = error_handler.handle_file_operation_error(
+            str(e), "read", file_path
+        )
         return safe_json_dumps(error_response)
     except ValueError as e:
         logger.error(f"Validation error in read_file: {e}")
-        error_response = error_handler.handle_validation_error(str(e), "file_path", file_path)
+        error_response = error_handler.handle_validation_error(
+            str(e), "file_path", file_path
+        )
         return safe_json_dumps(error_response)
     except Exception as e:
         logger.error(f"Unexpected error in read_file: {e}")
