@@ -14,12 +14,13 @@ Usage:
     mcpctl test         # Run quick integration checks
 """
 
-import sys
 import os
-import time
 import subprocess
+import sys
+import time
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
 import click
 
 # Project paths

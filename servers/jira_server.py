@@ -7,28 +7,28 @@ Provides integration with Jira via REST API
 import json
 import sys
 import time
-from pathlib import Path
-from typing import Optional, List, Dict
 from datetime import datetime
-from requests.auth import HTTPBasicAuth
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
+from requests.auth import HTTPBasicAuth
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
-from servers.config import (
-    load_env_file,
-    JiraConfig,
-    validate_config,
-    ConfigurationError,
-)
 from servers.base_client import BaseClient, handle_errors
+from servers.config import (
+    ConfigurationError,
+    JiraConfig,
+    load_env_file,
+    validate_config,
+)
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent

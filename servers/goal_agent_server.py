@@ -5,36 +5,36 @@ Manages goals, tasks, and execution plans with PostgreSQL persistence and Redis 
 Goals and plans are stored in PostgreSQL for durability, with Redis for temporary caching
 """
 
+import atexit
 import json
 import sys
-import atexit
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import wraps
-import threading
 
 from mcp.server.fastmcp import FastMCP
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
+from servers.base_client import handle_errors
 from servers.config import (
-    load_env_file,
+    ConfigurationError,
     GoalAgentConfig,
     PostgresConfig,
+    load_env_file,
     validate_config,
-    ConfigurationError,
 )
-from servers.base_client import handle_errors
 from servers.database import DatabaseManager
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -114,6 +114,7 @@ class CacheLayer:
         if enabled:
             try:
                 import redis
+
                 from servers.config import RedisConfig
 
                 # Initialize Redis with configuration

@@ -6,9 +6,9 @@ Handles environment variables, validation, and defaults.
 
 import os
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from dataclasses import dataclass, field
 
 
 def load_env_file(env_path: Path | None = None) -> None:

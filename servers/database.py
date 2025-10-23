@@ -5,26 +5,26 @@ Provides SQLAlchemy models for Goals and Tasks with relationship management.
 """
 
 import json
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Optional
-from contextlib import contextmanager
 
 from sqlalchemy import (
-    create_engine,
-    Column,
-    String,
-    Integer,
-    DateTime,
-    Text,
-    ForeignKey,
     JSON,
+    Column,
+    DateTime,
+    ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
+    create_engine,
     text,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, Session
-from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 Base = declarative_base()
 

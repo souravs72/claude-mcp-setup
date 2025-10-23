@@ -4,12 +4,12 @@ Internet/Search MCP Server - Production Ready with ThreadPoolExecutor
 Provides web search and fetch capabilities with concurrent processing.
 """
 
+import hashlib
 import json
 import sys
-import hashlib
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -18,9 +18,9 @@ from mcp.server.fastmcp import FastMCP
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
-from servers.config import load_env_file, InternetConfig, validate_config, ConfigurationError
 from servers.base_client import BaseClient, handle_errors
+from servers.config import ConfigurationError, InternetConfig, load_env_file, validate_config
+from servers.logging_config import log_server_shutdown, log_server_startup, setup_logging
 
 # Initialize
 project_root = Path(__file__).parent.parent

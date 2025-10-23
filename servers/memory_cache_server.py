@@ -4,31 +4,32 @@ Memory Cache MCP Server - Production Ready
 Provides Redis-based caching capabilities with TTL, patterns, and bulk operations
 """
 
+import atexit
 import json
 import sys
-import atexit
 from pathlib import Path
 from typing import Any, Optional
-import redis
-from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
 
+import redis
 from mcp.server.fastmcp import FastMCP
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import RedisError
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
-from servers.config import (
-    load_env_file,
-    RedisConfig,
-    validate_config,
-    ConfigurationError,
-)
 from servers.base_client import handle_errors, validate_non_empty, validate_positive_int
+from servers.config import (
+    ConfigurationError,
+    RedisConfig,
+    load_env_file,
+    validate_config,
+)
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent

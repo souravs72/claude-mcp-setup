@@ -4,30 +4,29 @@ MCP Dashboard Server - Real-time Operations Console
 Provides a web interface for monitoring MCP servers, Redis cache, goals, and logs.
 """
 
+import asyncio
+import json
 import os
 import sys
-import json
 import time
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uvicorn
-import redis
-import psutil
-import asyncio
-from typing import Set
 from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
+import psutil
+import redis
+import uvicorn
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.config import load_env_file, RedisConfig, PostgresConfig
+from servers.config import PostgresConfig, RedisConfig, load_env_file
 from servers.database import DatabaseManager
 
 
@@ -596,8 +595,8 @@ async def health_check():
 @app.post("/api/servers/control-all")
 async def control_all_servers(request: dict):
     """Control all MCP servers (start/stop/restart)."""
-    import subprocess
     import os
+    import subprocess
 
     action = request.get("action", "").lower()
     if action not in ["start", "stop", "restart"]:
