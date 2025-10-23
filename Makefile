@@ -8,21 +8,21 @@ help: ## Show this help message
 
 docker-up: ## Start PostgreSQL and Redis containers
 	@echo "Starting Docker containers..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "Waiting for containers to be healthy..."
 	@sleep 5
-	docker-compose ps
+	docker compose ps
 
 docker-down: ## Stop Docker containers
 	@echo "Stopping Docker containers..."
-	docker-compose down
+	docker compose down
 
 docker-logs: ## View Docker container logs
-	docker-compose logs -f
+	docker compose logs -f
 
 docker-status: ## Check Docker container status
 	@echo "Container Status:"
-	docker-compose ps
+	docker compose ps
 	@echo ""
 	@echo "PostgreSQL Health:"
 	docker exec mcp-postgres pg_isready -U postgres || echo "PostgreSQL not ready"
@@ -61,7 +61,7 @@ clean: ## Remove containers and volumes (WARNING: deletes data!)
 	@echo "WARNING: This will delete all data!"
 	@read -p "Are you sure? (y/N): " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		docker-compose down -v; \
+		docker compose down -v; \
 		echo "Cleaned up"; \
 	else \
 		echo "Cancelled"; \

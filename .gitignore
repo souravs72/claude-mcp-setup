@@ -26,3 +26,4 @@ claude-desktop-debian/
 claude-desktop-debian/*
 config/mcp_settings.json
 mcp_servers.egg-info/
+=2.9.9
