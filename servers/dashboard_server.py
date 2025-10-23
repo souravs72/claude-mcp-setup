@@ -240,9 +240,7 @@ def find_server_processes() -> List[Dict[str, Any]]:
                         if "_server.py" in arg:
                             server_name = Path(arg).stem
                             if server_name in server_names:
-                                server_key = server_name.replace("_server", "").replace(
-                                    "_", "-"
-                                )
+                                server_key = server_name.replace("_server", "").replace("_", "-")
 
                                 # Get memory info
                                 memory_mb = (
@@ -256,8 +254,7 @@ def find_server_processes() -> List[Dict[str, Any]]:
                                         "key": server_key,
                                         "name": SERVERS[server_key]["name"],
                                         "pid": proc.info["pid"],
-                                        "uptime": time.time()
-                                        - proc.info["create_time"],
+                                        "uptime": time.time() - proc.info["create_time"],
                                         "memory_mb": round(memory_mb, 2),
                                         "cpu_percent": proc.info.get("cpu_percent", 0),
                                     }
@@ -312,9 +309,7 @@ async def read_root():
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return HTMLResponse(
-        "<h1>Dashboard not found. Run setup first.</h1>", status_code=404
-    )
+    return HTMLResponse("<h1>Dashboard not found. Run setup first.</h1>", status_code=404)
 
 
 @app.get("/api/status")
@@ -382,9 +377,7 @@ async def get_servers():
 
         # Check environment variables
         env_configured = (
-            all(os.getenv(var) for var in server["env_vars"])
-            if server["env_vars"]
-            else True
+            all(os.getenv(var) for var in server["env_vars"]) if server["env_vars"] else True
         )
 
         servers_status.append(
@@ -427,9 +420,7 @@ async def get_redis_stats():
             },
             "memory": {
                 "used_memory_mb": round(info.get("used_memory", 0) / (1024 * 1024), 2),
-                "used_memory_peak_mb": round(
-                    info.get("used_memory_peak", 0) / (1024 * 1024), 2
-                ),
+                "used_memory_peak_mb": round(info.get("used_memory_peak", 0) / (1024 * 1024), 2),
                 "memory_fragmentation_ratio": info.get("mem_fragmentation_ratio", 0),
             },
             "clients": {
@@ -447,9 +438,7 @@ async def get_redis_stats():
             "total_keys": redis_client.dbsize(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get Redis stats: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get Redis stats: {str(e)}")
 
 
 @app.get("/api/goals")
@@ -520,9 +509,7 @@ async def get_goals():
 
         # Get active tasks
         active_tasks = [
-            task
-            for task in tasks_data.values()
-            if task.get("status") in ["in_progress", "pending"]
+            task for task in tasks_data.values() if task.get("status") in ["in_progress", "pending"]
         ][:10]
 
         return {
@@ -980,15 +967,9 @@ async def get_goal_details(goal_id: str):
             "task_count": len(goal_tasks),
             "tasks_by_status": {
                 "pending": sum(1 for t in goal_tasks if t.get("status") == "pending"),
-                "in_progress": sum(
-                    1 for t in goal_tasks if t.get("status") == "in_progress"
-                ),
-                "completed": sum(
-                    1 for t in goal_tasks if t.get("status") == "completed"
-                ),
-                "cancelled": sum(
-                    1 for t in goal_tasks if t.get("status") == "cancelled"
-                ),
+                "in_progress": sum(1 for t in goal_tasks if t.get("status") == "in_progress"),
+                "completed": sum(1 for t in goal_tasks if t.get("status") == "completed"),
+                "cancelled": sum(1 for t in goal_tasks if t.get("status") == "cancelled"),
             },
             "source": "PostgreSQL",
         }
@@ -1019,9 +1000,7 @@ async def delete_goal(goal_id: str):
         success = db.delete_goal(goal_id)
 
         if not success:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to delete goal {goal_id}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to delete goal {goal_id}")
 
         return {
             "success": True,
@@ -1054,9 +1033,7 @@ async def delete_task(task_id: str):
         success = db.delete_task(task_id)
 
         if not success:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to delete task {task_id}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to delete task {task_id}")
 
         return {
             "success": True,
@@ -1166,9 +1143,7 @@ async def update_task_status(task_id: str, status_data: UpdateTaskStatusRequest)
         # Update task
         from servers.goal_agent_server import agent
 
-        updated_task = agent.update_task_status(
-            task_id, status_data.status, status_data.result
-        )
+        updated_task = agent.update_task_status(task_id, status_data.status, status_data.result)
 
         return {
             "success": True,
@@ -1257,9 +1232,7 @@ async def collect_dashboard_data(include_system_stats: bool = True) -> dict:
                         {
                             "version": info.get("redis_version", "unknown"),
                             "uptime_days": info.get("uptime_in_days", 0),
-                            "used_memory_mb": round(
-                                info.get("used_memory", 0) / (1024 * 1024), 2
-                            ),
+                            "used_memory_mb": round(info.get("used_memory", 0) / (1024 * 1024), 2),
                             "connected_clients": info.get("connected_clients", 0),
                             "ops_per_sec": info.get("instantaneous_ops_per_sec", 0),
                         }
@@ -1308,9 +1281,7 @@ async def collect_dashboard_data(include_system_stats: bool = True) -> dict:
 
             # Check environment variables
             env_configured = (
-                all(os.getenv(var) for var in server["env_vars"])
-                if server["env_vars"]
-                else True
+                all(os.getenv(var) for var in server["env_vars"]) if server["env_vars"] else True
             )
 
             servers_status.append(
@@ -1426,9 +1397,7 @@ async def broadcast_updates():
             update_system_stats = cycle_count % 10 == 0  # Every 1000ms (10 cycles)
 
             # Collect current data (with optional system stats)
-            current_data = await collect_dashboard_data(
-                include_system_stats=update_system_stats
-            )
+            current_data = await collect_dashboard_data(include_system_stats=update_system_stats)
 
             # Smart comparison: only broadcast if meaningful changes occurred
             has_changes = False
@@ -1446,9 +1415,9 @@ async def broadcast_updates():
                 # Check Redis connection or key count
                 curr_redis = current_data.get("status", {}).get("redis", {})
                 prev_redis = previous_data.get("status", {}).get("redis", {})
-                if curr_redis.get("connected") != prev_redis.get(
-                    "connected"
-                ) or curr_redis.get("total_keys") != prev_redis.get("total_keys"):
+                if curr_redis.get("connected") != prev_redis.get("connected") or curr_redis.get(
+                    "total_keys"
+                ) != prev_redis.get("total_keys"):
                     has_changes = True
 
                 # Check system stats (only if included, with rounding to prevent minor fluctuations)

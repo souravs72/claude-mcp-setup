@@ -11,8 +11,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 10
-    reviewers:
-      - "souravs72"
     assignees:
       - "souravs72"
     commit-message:
@@ -25,7 +23,7 @@ updates:
       # Ignore major version updates that might break compatibility
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-  
+
   # GitHub Actions dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -34,8 +32,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "souravs72"
     assignees:
       - "souravs72"
     commit-message:
@@ -45,7 +41,7 @@ updates:
       - "dependencies"
       - "github-actions"
       - "ci"
-  
+
   # Docker dependencies (if using Docker)
   - package-ecosystem: "docker"
     directory: "/"
@@ -54,8 +50,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 3
-    reviewers:
-      - "souravs72"
     assignees:
       - "souravs72"
     commit-message:
