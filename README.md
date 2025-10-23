@@ -12,6 +12,7 @@ A collection of Model Context Protocol (MCP) servers that extend Claude with rea
 - **Command line** (execute bash commands safely)
 
 **Why build with MCP?** You'll learn:
+
 - How AI assistants integrate with real systems
 - Secure API design patterns
 - Async programming with Python
@@ -38,15 +39,15 @@ make start
 
 ## Available Servers
 
-| Server | Purpose | Key Features |
-|--------|---------|--------------|
-| **GitHub** | Repository management | Create repos, manage PRs, handle issues |
-| **Jira** | Project management | Create issues, manage sprints, story points |
-| **File** | File operations | Read/write files, search, directory listing |
-| **Bash** | Command execution | Safe command running with validation |
-| **Internet** | Web access | Google search, fetch web content |
-| **Memory** | Caching | Redis-based data storage |
-| **Frappe** | ERP integration | Connect to Frappe/ERPNext systems |
+| Server       | Purpose               | Key Features                                |
+| ------------ | --------------------- | ------------------------------------------- |
+| **GitHub**   | Repository management | Create repos, manage PRs, handle issues     |
+| **Jira**     | Project management    | Create issues, manage sprints, story points |
+| **File**     | File operations       | Read/write files, search, directory listing |
+| **Bash**     | Command execution     | Safe command running with validation        |
+| **Internet** | Web access            | Google search, fetch web content            |
+| **Memory**   | Caching               | Redis-based data storage                    |
+| **Frappe**   | ERP integration       | Connect to Frappe/ERPNext systems           |
 
 ## Configuration
 
@@ -82,7 +83,7 @@ Once configured, Claude can:
 "List all open pull requests"
 "Create an issue with title 'Bug fix needed'"
 
-# Jira operations  
+# Jira operations
 "Create a new task with 5 story points"
 "List all issues in the current sprint"
 "Update issue PROJ-123 status to 'In Progress'"
