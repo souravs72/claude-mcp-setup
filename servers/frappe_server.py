@@ -50,6 +50,15 @@ class FrappeClient(BaseClient):
 
         logger.info("Frappe client initialized successfully")
 
+    def close(self) -> None:
+        """Close the client session."""
+        try:
+            if hasattr(self, 'session') and self.session:
+                self.session.close()
+                logger.info("Frappe client session closed")
+        except Exception as e:
+            logger.error(f"Error closing session: {e}")
+
     def get_document(self, doctype: str, name: str) -> dict[str, Any]:
         """
         Get a specific document.
@@ -67,7 +76,7 @@ class FrappeClient(BaseClient):
         data = response.json()
 
         logger.info(f"Successfully retrieved {doctype}: {name}")
-        return data
+        return data.get("data", data)  # Consistent response handling
 
     def get_list(
         self,
@@ -239,8 +248,12 @@ def frappe_get_list(
     if not frappe_client:
         return json.dumps({"error": "Frappe client not initialized"})
 
-    filter_dict = json.loads(filters) if filters else None
-    fields_list = json.loads(fields) if fields else None
+    try:
+        filter_dict = json.loads(filters) if filters else None
+        fields_list = json.loads(fields) if fields else None
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in parameters: {e}")
+        return json.dumps({"error": f"Invalid JSON: {str(e)}"})
 
     result = frappe_client.get_list(doctype, filter_dict, fields_list, limit, order_by)
     return json.dumps(result, indent=2)
@@ -262,7 +275,12 @@ def frappe_create_document(doctype: str, data: str) -> str:
     if not frappe_client:
         return json.dumps({"error": "Frappe client not initialized"})
 
-    doc_data = json.loads(data)
+    try:
+        doc_data = json.loads(data)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in data: {e}")
+        return json.dumps({"error": f"Invalid JSON: {str(e)}"})
+
     result = frappe_client.create_document(doctype, doc_data)
     return json.dumps(result, indent=2)
 
@@ -284,7 +302,12 @@ def frappe_update_document(doctype: str, name: str, data: str) -> str:
     if not frappe_client:
         return json.dumps({"error": "Frappe client not initialized"})
 
-    doc_data = json.loads(data)
+    try:
+        doc_data = json.loads(data)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in data: {e}")
+        return json.dumps({"error": f"Invalid JSON: {str(e)}"})
+
     result = frappe_client.update_document(doctype, name, doc_data)
     return json.dumps(result, indent=2)
 
@@ -325,7 +348,10 @@ def main() -> None:
         raise
     finally:
         if frappe_client:
-            frappe_client.close()
+            try:
+                frappe_client.close()
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
 
 
 if __name__ == "__main__":

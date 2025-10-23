@@ -3,6 +3,7 @@
 Jira MCP Server - Production Ready
 Provides integration with Jira via REST API
 """
+
 import json
 import sys
 import time
@@ -16,8 +17,17 @@ from mcp.server.fastmcp import FastMCP
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
-from servers.config import load_env_file, JiraConfig, validate_config, ConfigurationError
+from servers.logging_config import (
+    setup_logging,
+    log_server_startup,
+    log_server_shutdown,
+)
+from servers.config import (
+    load_env_file,
+    JiraConfig,
+    validate_config,
+    ConfigurationError,
+)
 from servers.base_client import BaseClient, handle_errors
 
 # Initialize
@@ -72,7 +82,9 @@ class JiraClient(BaseClient):
     def _verify_agile_api(self) -> bool:
         """Check if Agile API is available."""
         try:
-            self._make_jira_request("GET", "/rest/agile/1.0/board", params={"maxResults": 1})
+            self._make_jira_request(
+                "GET", "/rest/agile/1.0/board", params={"maxResults": 1}
+            )
             logger.info("Agile API is available")
             return True
         except Exception as e:
@@ -108,7 +120,9 @@ class JiraClient(BaseClient):
                 return " | ".join(error_data["errorMessages"])
 
             if "errors" in error_data and error_data["errors"]:
-                errors = [f"{field}: {msg}" for field, msg in error_data["errors"].items()]
+                errors = [
+                    f"{field}: {msg}" for field, msg in error_data["errors"].items()
+                ]
                 return " | ".join(errors)
 
             return error_data.get("message", response.text[:500])
@@ -137,7 +151,10 @@ class JiraClient(BaseClient):
             for para in paragraphs:
                 if para.strip():
                     content.append(
-                        {"type": "paragraph", "content": [{"type": "text", "text": para.strip()}]}
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": para.strip()}],
+                        }
                     )
 
             return {
@@ -146,7 +163,12 @@ class JiraClient(BaseClient):
                 "content": (
                     content
                     if content
-                    else [{"type": "paragraph", "content": [{"type": "text", "text": description}]}]
+                    else [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": description}],
+                        }
+                    ]
                 ),
             }
         else:
@@ -155,7 +177,10 @@ class JiraClient(BaseClient):
                 "type": "doc",
                 "version": 1,
                 "content": [
-                    {"type": "paragraph", "content": [{"type": "text", "text": description}]}
+                    {
+                        "type": "paragraph",
+                        "content": [{"type": "text", "text": description}],
+                    }
                 ],
             }
 
@@ -215,14 +240,20 @@ class JiraClient(BaseClient):
         if fields:
             params["fields"] = ",".join(fields)
 
-        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}", params=params)
+        response = self._make_jira_request(
+            "GET", f"/rest/api/3/issue/{issue_key}", params=params
+        )
         data = response.json()
 
         logger.info(f"Retrieved issue: {issue_key}")
         return data
 
     def search_issues(
-        self, jql: str, max_results: int = 50, fields: Optional[List[str]] = None, start_at: int = 0
+        self,
+        jql: str,
+        max_results: int = 50,
+        fields: Optional[List[str]] = None,
+        start_at: int = 0,
     ) -> Dict:
         """
         Search for issues using JQL.
@@ -288,7 +319,8 @@ class JiraClient(BaseClient):
         logger.debug(f"Fetching create metadata: {project_key}/{issue_type_id}")
 
         response = self._make_jira_request(
-            "GET", f"/rest/api/3/issue/createmeta/{project_key}/issuetypes/{issue_type_id}"
+            "GET",
+            f"/rest/api/3/issue/createmeta/{project_key}/issuetypes/{issue_type_id}",
         )
         data = response.json()
 
@@ -394,7 +426,9 @@ class JiraClient(BaseClient):
         logger.debug(f"Issue creation payload: {json.dumps(payload, indent=2)}")
 
         try:
-            response = self._make_jira_request("POST", "/rest/api/3/issue", json=payload)
+            response = self._make_jira_request(
+                "POST", "/rest/api/3/issue", json=payload
+            )
             data = response.json()
 
             logger.debug(f"Create response: {json.dumps(data, indent=2)}")
@@ -420,7 +454,9 @@ class JiraClient(BaseClient):
             }
 
         except Exception as e:
-            logger.error(f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}")
+            logger.error(
+                f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}"
+            )
             logger.error(f"Error: {str(e)}")
             raise
 
@@ -452,6 +488,10 @@ class JiraClient(BaseClient):
             if issue.get("labels"):
                 fields["labels"] = issue["labels"]
 
+            # Handle story points (REQUIRED for all issue types)
+            if "story_points" in issue and issue["story_points"] is not None:
+                fields["customfield_10031"] = issue["story_points"]
+
             if issue.get("additional_fields"):
                 fields.update(issue["additional_fields"])
 
@@ -460,7 +500,9 @@ class JiraClient(BaseClient):
         payload = {"issueUpdates": issue_updates}
 
         try:
-            response = self._make_jira_request("POST", "/rest/api/3/issue/bulk", json=payload)
+            response = self._make_jira_request(
+                "POST", "/rest/api/3/issue/bulk", json=payload
+            )
             data = response.json()
 
             successful = len(data.get("issues", []))
@@ -494,7 +536,9 @@ class JiraClient(BaseClient):
         payload = {"fields": fields}
 
         try:
-            self._make_jira_request("PUT", f"/rest/api/3/issue/{issue_key}", json=payload)
+            self._make_jira_request(
+                "PUT", f"/rest/api/3/issue/{issue_key}", json=payload
+            )
             logger.info(f"Updated issue: {issue_key}")
             return True
 
@@ -543,14 +587,18 @@ class JiraClient(BaseClient):
         payload = {"transition": {"id": transition_id}}
 
         if comment:
-            payload["update"] = {"comment": [{"add": {"body": self._format_description(comment)}}]}
+            payload["update"] = {
+                "comment": [{"add": {"body": self._format_description(comment)}}]
+            }
 
         if fields:
             payload["fields"] = fields
 
         logger.debug(f"Transition payload: {json.dumps(payload, indent=2)}")
 
-        self._make_jira_request("POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload)
+        self._make_jira_request(
+            "POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload
+        )
 
         logger.info(f"Transitioned issue: {issue_key}")
         return True
@@ -567,7 +615,9 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching transitions for: {issue_key}")
 
-        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/transitions")
+        response = self._make_jira_request(
+            "GET", f"/rest/api/3/issue/{issue_key}/transitions"
+        )
         data = response.json()
 
         transitions = data.get("transitions", [])
@@ -575,7 +625,9 @@ class JiraClient(BaseClient):
 
         return transitions
 
-    def add_comment(self, issue_key: str, comment: str, rich_text: bool = False) -> Dict:
+    def add_comment(
+        self, issue_key: str, comment: str, rich_text: bool = False
+    ) -> Dict:
         """
         Add a comment to an issue.
 
@@ -611,7 +663,9 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching comments for: {issue_key}")
 
-        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/comment")
+        response = self._make_jira_request(
+            "GET", f"/rest/api/3/issue/{issue_key}/comment"
+        )
         data = response.json()
 
         comments = data.get("comments", [])
@@ -676,7 +730,9 @@ class JiraClient(BaseClient):
 
         payload = {"accountId": account_id}
 
-        self._make_jira_request("PUT", f"/rest/api/3/issue/{issue_key}/assignee", json=payload)
+        self._make_jira_request(
+            "PUT", f"/rest/api/3/issue/{issue_key}/assignee", json=payload
+        )
 
         logger.info(f"Assigned issue {issue_key}")
         return True
@@ -693,7 +749,9 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching watchers for: {issue_key}")
 
-        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/watchers")
+        response = self._make_jira_request(
+            "GET", f"/rest/api/3/issue/{issue_key}/watchers"
+        )
         data = response.json()
 
         logger.info(f"Retrieved watchers for {issue_key}")
@@ -712,14 +770,18 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Adding watcher to {issue_key}")
 
-        self._make_jira_request("POST", f"/rest/api/3/issue/{issue_key}/watchers", json=account_id)
+        self._make_jira_request(
+            "POST", f"/rest/api/3/issue/{issue_key}/watchers", json=account_id
+        )
 
         logger.info(f"Added watcher to {issue_key}")
         return True
 
     # Sprint and Board Management Methods
 
-    def get_boards(self, project_key: Optional[str] = None, max_results: int = 50) -> List[Dict]:
+    def get_boards(
+        self, project_key: Optional[str] = None, max_results: int = 50
+    ) -> List[Dict]:
         """
         Get boards, optionally filtered by project.
 
@@ -739,7 +801,9 @@ class JiraClient(BaseClient):
         if project_key:
             params["projectKeyOrId"] = project_key
 
-        response = self._make_jira_request("GET", "/rest/agile/1.0/board", params=params)
+        response = self._make_jira_request(
+            "GET", "/rest/agile/1.0/board", params=params
+        )
         data = response.json()
 
         boards = data.get("values", [])
@@ -831,7 +895,9 @@ class JiraClient(BaseClient):
 
         payload = {"issues": issue_keys}
 
-        self._make_jira_request("POST", f"/rest/agile/1.0/sprint/{sprint_id}/issue", json=payload)
+        self._make_jira_request(
+            "POST", f"/rest/agile/1.0/sprint/{sprint_id}/issue", json=payload
+        )
 
         logger.info(f"Added issues to sprint {sprint_id}")
         return True
@@ -1039,6 +1105,124 @@ def jira_get_create_metadata(project_key: str, issue_type_id: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
+def jira_check_story_points_requirement(
+    project_key: str, issue_type: str = "Story"
+) -> str:
+    """
+    Check if story points are required for a specific issue type in a project.
+
+    Args:
+        project_key: Project key (e.g., "CGV2")
+        issue_type: Issue type to check (default: "Story")
+
+    Returns:
+        JSON string with story points requirement information
+    """
+    if not jira_client:
+        return json.dumps(
+            {
+                "error": "Jira client not initialized",
+                "type": "configuration_error",
+                "suggestion": "Check Jira configuration and credentials.",
+            }
+        )
+
+    try:
+        # Get issue types for the project
+        issue_types = jira_client.get_project_issue_types(project_key)
+
+        # Find the specific issue type
+        target_issue_type = None
+        for it in issue_types:
+            if it.get("name", "").lower() == issue_type.lower():
+                target_issue_type = it
+                break
+
+        if not target_issue_type:
+            return json.dumps(
+                {
+                    "error": f"Issue type '{issue_type}' not found in project '{project_key}'",
+                    "type": "not_found_error",
+                    "suggestion": f"Use jira_get_project_issue_types to see available issue types for project '{project_key}'",
+                    "available_issue_types": [it.get("name") for it in issue_types],
+                }
+            )
+
+        # Get metadata for this issue type
+        metadata = jira_client.get_create_metadata(project_key, target_issue_type["id"])
+
+        # Check for story points fields
+        story_points_fields = []
+        required_fields = []
+
+        if "projects" in metadata and len(metadata["projects"]) > 0:
+            project_data = metadata["projects"][0]
+            if "issuetypes" in project_data:
+                for it_data in project_data["issuetypes"]:
+                    if it_data.get("id") == target_issue_type["id"]:
+                        if "fields" in it_data:
+                            for field_id, field_data in it_data["fields"].items():
+                                field_name = field_data.get("name", "").lower()
+                                is_required = field_data.get("required", False)
+
+                                # Check if this looks like a story points field
+                                if any(
+                                    keyword in field_name
+                                    for keyword in [
+                                        "story point",
+                                        "point",
+                                        "estimate",
+                                        "effort",
+                                    ]
+                                ):
+                                    story_points_fields.append(
+                                        {
+                                            "field_id": field_id,
+                                            "field_name": field_data.get("name"),
+                                            "required": is_required,
+                                            "field_type": field_data.get(
+                                                "schema", {}
+                                            ).get("type"),
+                                        }
+                                    )
+
+                                if is_required:
+                                    required_fields.append(
+                                        {
+                                            "field_id": field_id,
+                                            "field_name": field_data.get("name"),
+                                            "field_type": field_data.get(
+                                                "schema", {}
+                                            ).get("type"),
+                                        }
+                                    )
+
+        return json.dumps(
+            {
+                "project_key": project_key,
+                "issue_type": issue_type,
+                "story_points_required": any(
+                    field["required"] for field in story_points_fields
+                ),
+                "story_points_fields": story_points_fields,
+                "all_required_fields": required_fields,
+                "suggestion": "Use the story_points parameter when creating issues if story points are required.",
+            },
+            indent=2,
+        )
+
+    except Exception as e:
+        return json.dumps(
+            {
+                "error": f"Failed to check story points requirement: {str(e)}",
+                "type": "check_error",
+                "suggestion": "Verify the project key and issue type are correct.",
+            }
+        )
+
+
+@mcp.tool()
+@handle_errors(logger)
 def jira_create_issue(
     project_key: str,
     summary: str,
@@ -1047,11 +1231,12 @@ def jira_create_issue(
     priority: Optional[str] = None,
     assignee: Optional[str] = None,
     labels: Optional[str] = None,
+    story_points: Optional[int] = None,
     additional_fields: Optional[dict] = None,
     rich_text: bool = False,
 ) -> str:
     """
-    Create a new Jira issue.
+    Create a new Jira issue with improved story points handling.
 
     Args:
         project_key: Project key (e.g., "CGV2")
@@ -1061,6 +1246,7 @@ def jira_create_issue(
         priority: Priority name (High, Medium, Low, etc.)
         assignee: Assignee account ID
         labels: JSON array of labels
+        story_points: Story points value (1-100, typically 1, 2, 3, 5, 8, 13, 21) - REQUIRED for all issue types
         additional_fields: Dict with custom field values (e.g., {"customfield_10031": 1})
         rich_text: Preserve paragraph formatting in description
 
@@ -1068,35 +1254,142 @@ def jira_create_issue(
         JSON string with created issue including issue key and URL
 
     Examples:
-        Basic issue:
-        jira_create_issue("CGV2", "Bug in login", "Users cannot login")
-
-        With story points:
-        jira_create_issue("CGV2", "New feature", "Description",
-                          additional_fields={"customfield_10031": 3})
+        Basic issue with story points:
+        jira_create_issue("CGV2", "Bug in login", "Users cannot login", story_points=2)
 
         Full example:
         jira_create_issue("CGV2", "Test Issue", "Testing", "Task", "Low",
-                          labels='["bug", "urgent"]',
-                          additional_fields={"customfield_10031": 1})
+                          labels='["bug", "urgent"]', story_points=5)
     """
     if not jira_client:
-        return json.dumps({"error": "Jira client not initialized"})
+        return json.dumps(
+            {
+                "error": "Jira client not initialized",
+                "type": "configuration_error",
+                "suggestion": "Check Jira configuration and credentials.",
+            }
+        )
 
-    labels_list = json.loads(labels) if labels else None
+    # Story points are REQUIRED for all issue types in this project
+    if story_points is None:
+        return json.dumps(
+            {
+                "error": f"Story points are required for all issue types in this project. Issue type '{issue_type}' requires story points.",
+                "type": "required_field_error",
+                "suggestion": "Provide story_points parameter (1-100). Common values: 1, 2, 3, 5, 8, 13, 21. Story points are mandatory for all issue types in this Jira project.",
+                "story_points_required": True,
+                "issue_type": issue_type,
+            }
+        )
 
-    issue = jira_client.create_issue(
-        project_key,
-        summary,
-        description,
-        issue_type,
-        priority,
-        assignee,
-        labels_list,
-        additional_fields,
-        rich_text,
-    )
-    return json.dumps(issue, indent=2)
+    # Validate story points if provided
+    if not isinstance(story_points, int) or story_points < 1 or story_points > 100:
+        return json.dumps(
+            {
+                "error": f"Invalid story points value: {story_points}. Must be an integer between 1 and 100.",
+                "type": "validation_error",
+                "suggestion": "Use common story point values like 1, 2, 3, 5, 8, 13, 21, or provide a reasonable estimate.",
+            }
+        )
+
+    # Parse labels
+    labels_list = None
+    if labels:
+        try:
+            labels_list = json.loads(labels)
+            if not isinstance(labels_list, list):
+                return json.dumps(
+                    {
+                        "error": f"Labels must be a JSON array, got: {type(labels_list).__name__}",
+                        "type": "validation_error",
+                        "suggestion": 'Provide labels as a JSON array, e.g., \'["bug", "urgent"]\'',
+                    }
+                )
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {
+                    "error": f"Invalid JSON format for labels: {e}",
+                    "type": "validation_error",
+                    "suggestion": 'Provide labels as a JSON array, e.g., \'["bug", "urgent"]\'',
+                }
+            )
+
+    # Prepare additional fields with story points
+    final_additional_fields = additional_fields or {}
+
+    # Add story points to additional fields (REQUIRED)
+    story_points_fields = [
+        "customfield_10031",  # Common Atlassian story points field
+        "customfield_10002",  # Another common field
+        "customfield_10003",  # Alternative field
+    ]
+
+    # Use the first available field or default to the most common one
+    story_points_field = story_points_fields[0]
+    final_additional_fields[story_points_field] = story_points
+
+    try:
+        issue = jira_client.create_issue(
+            project_key,
+            summary,
+            description,
+            issue_type,
+            priority,
+            assignee,
+            labels_list,
+            final_additional_fields,
+            rich_text,
+        )
+
+        # Add helpful information to the response
+        response_data = issue
+        response_data["story_points"] = story_points
+        response_data["story_points_field"] = story_points_field
+        response_data["story_points_required"] = True
+
+        return json.dumps(response_data, indent=2)
+
+    except Exception as e:
+        error_msg = str(e)
+
+        # Check for common Jira errors and provide helpful suggestions
+        if "required field" in error_msg.lower():
+            if (
+                "story points" in error_msg.lower()
+                or "customfield" in error_msg.lower()
+            ):
+                return json.dumps(
+                    {
+                        "error": f"Story points are required for this issue type: {error_msg}",
+                        "type": "required_field_error",
+                        "suggestion": "Provide story_points parameter (1-100). Story points are mandatory for all issue types in this Jira project.",
+                        "story_points_required": True,
+                    }
+                )
+            else:
+                return json.dumps(
+                    {
+                        "error": f"Required field missing: {error_msg}",
+                        "type": "required_field_error",
+                        "suggestion": "Check the issue type requirements and provide all mandatory fields.",
+                    }
+                )
+        elif "invalid" in error_msg.lower():
+            return json.dumps(
+                {
+                    "error": f"Invalid data provided: {error_msg}",
+                    "type": "validation_error",
+                    "suggestion": "Check the provided values and ensure they match the expected format.",
+                }
+            )
+        else:
+            return json.dumps(
+                {
+                    "error": f"Failed to create issue: {error_msg}",
+                    "type": "creation_error",
+                    "suggestion": "Check the project key, issue type, and required fields.",
+                }
+            )
 
 
 @mcp.tool()
@@ -1108,7 +1401,7 @@ def jira_create_issues_bulk(issues: str) -> str:
     Args:
         issues: JSON array of issue objects, each with:
                - project_key, summary, description (required)
-               - issue_type, priority, labels, additional_fields (optional)
+               - issue_type, priority, labels, story_points (required), additional_fields (optional)
 
     Returns:
         JSON string with bulk creation results
@@ -1116,9 +1409,47 @@ def jira_create_issues_bulk(issues: str) -> str:
     if not jira_client:
         return json.dumps({"error": "Jira client not initialized"})
 
-    issues_list = json.loads(issues)
-    result = jira_client.create_issues_bulk(issues_list)
-    return json.dumps(result, indent=2)
+    try:
+        issues_list = json.loads(issues)
+
+        # Validate that all issues have story points
+        for i, issue in enumerate(issues_list):
+            if "story_points" not in issue or issue["story_points"] is None:
+                return json.dumps(
+                    {
+                        "error": f"Issue {i+1} is missing required story_points field",
+                        "type": "validation_error",
+                        "suggestion": "All issues must include story_points parameter (1-100). Story points are mandatory for all issue types in this Jira project.",
+                        "story_points_required": True,
+                    }
+                )
+
+            # Validate story points value
+            story_points = issue["story_points"]
+            if (
+                not isinstance(story_points, int)
+                or story_points < 1
+                or story_points > 100
+            ):
+                return json.dumps(
+                    {
+                        "error": f"Issue {i+1} has invalid story_points value: {story_points}. Must be an integer between 1 and 100.",
+                        "type": "validation_error",
+                        "suggestion": "Use common story point values like 1, 2, 3, 5, 8, 13, 21, or provide a reasonable estimate.",
+                    }
+                )
+
+        result = jira_client.create_issues_bulk(issues_list)
+        return json.dumps(result, indent=2)
+
+    except json.JSONDecodeError as e:
+        return json.dumps(
+            {
+                "error": f"Invalid JSON format for issues: {e}",
+                "type": "validation_error",
+                "suggestion": "Provide issues as a JSON array with proper format.",
+            }
+        )
 
 
 @mcp.tool()
@@ -1164,7 +1495,10 @@ def jira_delete_issue(issue_key: str) -> str:
 @mcp.tool()
 @handle_errors(logger)
 def jira_transition_issue(
-    issue_key: str, transition_id: str, comment: Optional[str] = None, fields: Optional[str] = None
+    issue_key: str,
+    transition_id: str,
+    comment: Optional[str] = None,
+    fields: Optional[str] = None,
 ) -> str:
     """
     Transition a Jira issue to a different status.
@@ -1182,7 +1516,9 @@ def jira_transition_issue(
         return json.dumps({"error": "Jira client not initialized"})
 
     fields_dict = json.loads(fields) if fields else None
-    result = jira_client.transition_issue(issue_key, transition_id, comment, fields_dict)
+    result = jira_client.transition_issue(
+        issue_key, transition_id, comment, fields_dict
+    )
     return json.dumps({"success": result})
 
 
@@ -1247,7 +1583,9 @@ def jira_get_comments(issue_key: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def jira_link_issues(inward_issue: str, outward_issue: str, link_type: str = "Relates") -> str:
+def jira_link_issues(
+    inward_issue: str, outward_issue: str, link_type: str = "Relates"
+) -> str:
     """
     Create a link between two Jira issues.
 
