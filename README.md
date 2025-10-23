@@ -1,92 +1,137 @@
 # Claude MCP Servers
 
-Enterprise-grade Model Context Protocol servers that transform Claude into a full-stack development assistant with GitHub, Jira, Frappe ERP, and web capabilities.
+A collection of Model Context Protocol (MCP) servers that extend Claude with real-world capabilities like GitHub, Jira, file operations, and web access.
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![MCP Protocol](https://img.shields.io/badge/MCP-1.0+-green.svg)](https://modelcontextprotocol.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## What is MCP?
 
-## 🚀 Quick Start
+**Model Context Protocol (MCP)** is a standard for connecting AI assistants to external tools and data sources. Think of it as a universal adapter that lets Claude interact with:
+
+- **APIs** (GitHub, Jira, web services)
+- **File systems** (read, write, search files)
+- **Databases** (PostgreSQL, Redis)
+- **Command line** (execute bash commands safely)
+
+**Why build with MCP?** You'll learn:
+- How AI assistants integrate with real systems
+- Secure API design patterns
+- Async programming with Python
+- Error handling and validation
+- Tool composition and orchestration
+
+## Quick Setup
 
 ```bash
-# Clone and setup
-git clone https://github.com/your-org/claude-mcp-setup.git
+# 1. Clone and setup
+git clone https://github.com/souravs72/claude-mcp-setup.git
 cd claude-mcp-setup
 
-# Install everything
+# 2. Install dependencies
 make setup
 
-# Configure credentials
+# 3. Configure credentials
 cp config/mcp_settings.json.template config/mcp_settings.json
-nano config/mcp_settings.json
+# Edit config/mcp_settings.json with your API keys
 
-# Start all servers
+# 4. Start servers
 make start
 ```
 
-## 📚 Documentation
+## Available Servers
 
-- **[Getting Started](GETTING_STARTED.md)** - Complete setup guide
-- **[Configuration](CONFIGURATION.md)** - Environment setup and CLI usage
-- **[Architecture](ARCHITECTURE.md)** - Technical implementation details
-- **[API Reference](API_REFERENCE.md)** - Complete API documentation
-- **[Troubleshooting](TROUBLESHOOTING.md)** - Common issues and solutions
+| Server | Purpose | Key Features |
+|--------|---------|--------------|
+| **GitHub** | Repository management | Create repos, manage PRs, handle issues |
+| **Jira** | Project management | Create issues, manage sprints, story points |
+| **File** | File operations | Read/write files, search, directory listing |
+| **Bash** | Command execution | Safe command running with validation |
+| **Internet** | Web access | Google search, fetch web content |
+| **Memory** | Caching | Redis-based data storage |
+| **Frappe** | ERP integration | Connect to Frappe/ERPNext systems |
 
-## 🎯 What This Does
+## Configuration
 
-Transform Claude into an intelligent development assistant that can:
+Edit `config/mcp_settings.json` with your credentials:
 
-- **📋 Goal-Based Task Management** - Create complex projects with automatic task breakdown
-- **💻 GitHub Integration** - Manage repositories, branches, PRs, and issues
-- **🎫 Jira Management** - Create/update issues, manage sprints, link tickets
-- **🌐 Web Access** - Google search, fetch web content, batch operations
-- **💾 Persistent Storage** - PostgreSQL for durable state, Redis for caching
-- **📊 Real-time Dashboard** - Monitor goals, tasks, and server status
-
-## 🛠️ Management
-
-```bash
-# Check status
-make status
-
-# View dashboard
-open http://localhost:8000
-
-# CLI management
-mcpctl status
-mcpctl goal create "Test Goal" "Testing the system"
+```json
+{
+  "mcpServers": {
+    "github-server": {
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"
+      }
+    },
+    "jira-server": {
+      "env": {
+        "JIRA_BASE_URL": "https://yourcompany.atlassian.net",
+        "JIRA_EMAIL": "your@email.com",
+        "JIRA_API_TOKEN": "your_token_here",
+        "JIRA_PROJECT_KEY": "PROJ"
+      }
+    }
+  }
+}
 ```
 
-## 📊 My GitHub Stats
+## Usage
 
-<div align="center">
+Once configured, Claude can:
 
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=souravs72&show_icons=true&theme=dark&hide_border=true&count_private=true)
+```bash
+# GitHub operations
+"Create a new repository called 'my-project'"
+"List all open pull requests"
+"Create an issue with title 'Bug fix needed'"
 
-![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=souravs72&layout=compact&theme=dark&hide_border=true&count_private=true)
+# Jira operations  
+"Create a new task with 5 story points"
+"List all issues in the current sprint"
+"Update issue PROJ-123 status to 'In Progress'"
 
-![GitHub Streak](https://github-readme-streak-stats.herokuapp.com/?user=souravs72&theme=dark&hide_border=true)
+# File operations
+"Read the contents of README.md"
+"Search for all Python files in the project"
+"Create a new file called 'config.py'"
 
-</div>
+# Web operations
+"Search Google for 'Python async programming'"
+"Fetch the content from https://example.com"
+```
 
-## ⭐ Support This Project
+## Development
 
-If you found this project helpful, please consider:
+```bash
+# Check server status
+make status
 
-- ⭐ **Star this repository** if you like it
-- 👀 **Watch** for updates and new features
-- 🍴 **Fork** to contribute your own improvements
-- 🐛 **Report issues** to help us improve
-- 💬 **Share** with others who might benefit
+# View logs
+make logs
 
-Your support helps us continue developing and maintaining this project!
+# Run tests
+make test
 
-## 🤝 Contributing
+# Stop all servers
+make stop
+```
 
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+## Key Features
 
-## 📜 License
+- **🔒 Security First**: Command validation, path restrictions, API key protection
+- **🤖 AI-Friendly**: Structured error messages, helpful suggestions
+- **⚡ Fast**: Async operations, efficient caching
+- **🛠️ Developer-Friendly**: Clear APIs, comprehensive logging
+- **🔧 Extensible**: Easy to add new servers and capabilities
 
-MIT License - see [LICENSE](LICENSE) file for details.
+## Requirements
+
+- Python 3.10+
+- Redis (for caching)
+- PostgreSQL (for persistent storage)
+- API keys for external services
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
+
+**Learning MCP?** This project demonstrates real-world MCP server implementation with production-ready patterns for security, error handling, and AI integration.
