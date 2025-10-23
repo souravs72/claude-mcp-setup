@@ -1,12 +1,59 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: debug-statements
+      - id: check-docstring-first
+
   - repo: https://github.com/psf/black
-    rev: 24.8.0
+    rev: 25.9.0
     hooks:
       - id: black
         language_version: python3.10
+        args: [--line-length=88]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 7.0.0
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=88]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        args:
+          [
+            --max-line-length=100,
+            --extend-ignore=E203,
+            W503,
+            E402,
+            E501,
+            F401,
+            F541,
+            F841,
+          ]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+    rev: v1.18.2
     hooks:
       - id: mypy
-        additional_dependencies: [types-requests, types-redis]
+        args: [--config-file=pyproject.toml]
+        continue-on-error: true
+
+  - repo: local
+    hooks:
+      - id: mcp-server-tests
+        name: MCP Server Tests
+        entry: python scripts/test_server_startup.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

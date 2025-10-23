@@ -4,8 +4,9 @@ Base client class with retry logic, error handling, rate limiting, and connectio
 """
 import json
 import logging
-from typing import Any, Callable, TypeVar, ParamSpec
 from functools import wraps
+from typing import Any, Callable, ParamSpec, TypeVar
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry

@@ -5,8 +5,8 @@ Provides consistent logging format, rotation, and error handling.
 """
 import logging
 import sys
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 

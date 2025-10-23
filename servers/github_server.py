@@ -6,16 +6,16 @@ Provides full GitHub integration including code changes, branching, and commits
 import json
 import sys
 from pathlib import Path
-from github import Github, Auth, GithubException, InputGitTreeElement
 
+from github import Auth, Github, GithubException, InputGitTreeElement
 from mcp.server.fastmcp import FastMCP
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import setup_logging, log_server_startup, log_server_shutdown
-from servers.config import load_env_file, GitHubConfig, validate_config, ConfigurationError
 from servers.base_client import handle_errors
+from servers.config import ConfigurationError, GitHubConfig, load_env_file, validate_config
+from servers.logging_config import log_server_shutdown, log_server_startup, setup_logging
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -955,6 +955,7 @@ def get_directory_tree(
 
     tree = github_client.get_directory_tree(repo_name, path, branch, recursive)
     return json.dumps(tree, indent=2)
+
 
 def main() -> None:
     """Main entry point for Frappe MCP Server."""

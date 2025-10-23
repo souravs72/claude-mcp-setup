@@ -10,22 +10,22 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
-from typing import Any, Dict, Optional, List
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
-from servers.config import load_env_file
 from servers.base_client import validate_non_empty
+from servers.config import load_env_file
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -216,9 +216,7 @@ class BashExecutorClient:
             )
 
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=timeout
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()
@@ -262,9 +260,7 @@ class BashExecutorClient:
             if result["success"]:
                 self.logger.info(f"Command succeeded: {command}")
             else:
-                self.logger.warning(
-                    f"Command failed: {command} (exit code: {process.returncode})"
-                )
+                self.logger.warning(f"Command failed: {command} (exit code: {process.returncode})")
 
             return result
 
@@ -354,12 +350,8 @@ class BashExecutorClient:
             return {
                 "exists": dir_path.exists(),
                 "is_directory": dir_path.is_dir() if dir_path.exists() else False,
-                "readable": os.access(dir_path, os.R_OK)
-                if dir_path.exists()
-                else False,
-                "writable": os.access(dir_path, os.W_OK)
-                if dir_path.exists()
-                else False,
+                "readable": os.access(dir_path, os.R_OK) if dir_path.exists() else False,
+                "writable": os.access(dir_path, os.W_OK) if dir_path.exists() else False,
                 "path": str(dir_path),
                 "timestamp": datetime.now().isoformat(),
             }
@@ -410,9 +402,7 @@ class BashExecutorClient:
                             "type": "directory" if item.is_dir() else "file",
                             "path": str(item),
                             "size": stat_info.st_size,
-                            "modified": datetime.fromtimestamp(
-                                stat_info.st_mtime
-                            ).isoformat(),
+                            "modified": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
                         }
                     )
                 except (OSError, PermissionError):

@@ -24,8 +24,10 @@ from dotenv import load_dotenv
 try:
     from colorlog import ColoredFormatter
     import logging
+    HAS_COLORLOG = True
 except ImportError:
-    logging = None
+    import logging
+    HAS_COLORLOG = False
 
 # ────────────────────────────── Setup ──────────────────────────────
 
@@ -56,9 +58,9 @@ def setup_logger() -> logging.Logger:
     logger = logging.getLogger("MCP_Test")
     logger.setLevel(logging.INFO)
 
-    if logging and not logger.handlers:
+    if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
-        if "ColoredFormatter" in dir():
+        if HAS_COLORLOG:
             formatter = ColoredFormatter(
                 "%(log_color)s%(levelname)-8s%(reset)s | %(message)s",
                 log_colors={

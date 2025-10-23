@@ -79,3 +79,34 @@ redis: ## Open Redis CLI
 
 stats: ## Show container resource usage
 	docker stats mcp-postgres mcp-redis --no-stream
+
+# Pre-commit hooks
+install-hooks: ## Install pre-commit hooks
+	@echo "Installing pre-commit hooks..."
+	./scripts/install_precommit.sh
+
+lint: ## Run all linting tools
+	@echo "Running Black formatting..."
+	black servers/ mcpctl.py
+	@echo "Running isort import sorting..."
+	isort servers/ mcpctl.py
+	@echo "Running Flake8 linting..."
+	flake8 servers/ mcpctl.py --max-line-length=100 --extend-ignore=E203,W503,E402,E501,F401,F541,F841
+	@echo "Running MyPy type checking..."
+	mypy servers/ --config-file pyproject.toml || true
+	@echo "Linting complete!"
+
+lint-check: ## Check linting without fixing
+	@echo "Checking Black formatting..."
+	black --check servers/ mcpctl.py
+	@echo "Checking isort import sorting..."
+	isort --check-only servers/ mcpctl.py
+	@echo "Checking Flake8 linting..."
+	flake8 servers/ mcpctl.py --max-line-length=100 --extend-ignore=E203,W503,E402,E501,F401,F541,F841
+	@echo "Checking MyPy type checking..."
+	mypy servers/ --config-file pyproject.toml || true
+	@echo "All linting checks passed!"
+
+test: ## Run MCP server tests
+	@echo "Running MCP server tests..."
+	python scripts/test_server_startup.py

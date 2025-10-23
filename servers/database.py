@@ -5,26 +5,26 @@ Provides SQLAlchemy models for Goals and Tasks with relationship management.
 """
 
 import json
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Optional
-from contextlib import contextmanager
 
 from sqlalchemy import (
-    create_engine,
-    Column,
-    String,
-    Integer,
-    DateTime,
-    Text,
-    ForeignKey,
     JSON,
+    Column,
+    DateTime,
+    ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
+    create_engine,
     text,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, Session
-from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 Base = declarative_base()
 
@@ -40,9 +40,7 @@ class GoalModel(Base):
     status = Column(String(20), nullable=False, index=True)
     repos = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     meta_data = Column("metadata", JSON, default=dict)
 
     # Relationship to tasks
@@ -96,9 +94,7 @@ class TaskModel(Base):
     estimated_effort = Column(String(50), nullable=True)
     assigned_tools = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
     result = Column(JSON, nullable=True)
 
@@ -128,9 +124,7 @@ class TaskModel(Base):
             "assigned_tools": self.assigned_tools or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "result": self.result,
         }
 
@@ -138,9 +132,7 @@ class TaskModel(Base):
 class DatabaseManager:
     """Manages PostgreSQL database connections and operations."""
 
-    def __init__(
-        self, database_url: str, pool_size: int = 10, max_overflow: int = 20
-    ) -> None:
+    def __init__(self, database_url: str, pool_size: int = 10, max_overflow: int = 20) -> None:
         """
         Initialize database manager.
 

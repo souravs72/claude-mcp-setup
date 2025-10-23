@@ -5,28 +5,28 @@ Provides local file system operations including reading, writing, and directory 
 Python >=3.10 compatible
 """
 
-import json
-import sys
-import mimetypes
-import hashlib
 import fnmatch
+import hashlib
+import json
+import mimetypes
+import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from datetime import datetime
 
 from mcp.server.fastmcp import FastMCP
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
-from servers.config import load_env_file
 from servers.base_client import validate_non_empty
+from servers.config import load_env_file
 from servers.error_handler import MCPErrorHandler, safe_json_dumps, validate_file_path
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -79,9 +79,7 @@ class FileSystemClient:
             "/usr/sbin",  # System binaries
         ]
 
-        self.logger.info(
-            f"File server initialized with allowed paths: {self.allowed_paths}"
-        )
+        self.logger.info(f"File server initialized with allowed paths: {self.allowed_paths}")
         self.logger.info(f"Restricted paths: {self.restricted_paths}")
 
     def _validate_path(self, file_path: str, allow_write: bool = False) -> Path:
@@ -117,8 +115,7 @@ class FileSystemClient:
             # Security check: ensure path is within allowed directories
             if self.allowed_paths:
                 is_allowed = any(
-                    path_str.startswith(allowed_path)
-                    for allowed_path in self.allowed_paths
+                    path_str.startswith(allowed_path) for allowed_path in self.allowed_paths
                 )
                 if not is_allowed:
                     raise ValueError(
@@ -171,13 +168,15 @@ class FileSystemClient:
                             for f in path.parent.iterdir()
                             if f.is_file() and path.name.lower() in f.name.lower()
                         ]
-                        suggestion = (
-                            f"File not found: '{file_path}' (resolved to '{path}'). "
-                        )
+                        suggestion = f"File not found: '{file_path}' (resolved to '{path}'). "
                         if similar_files:
-                            suggestion += f"Similar files in the same directory: {similar_files[:5]}"
+                            suggestion += (
+                                f"Similar files in the same directory: {similar_files[:5]}"
+                            )
                         else:
-                            suggestion += f"Directory '{path.parent}' exists but contains no similar files."
+                            suggestion += (
+                                f"Directory '{path.parent}' exists but contains no similar files."
+                            )
                     except (OSError, PermissionError):
                         suggestion = f"File not found: '{file_path}' (resolved to '{path}'). Please check the path."
                 else:
@@ -331,9 +330,7 @@ class FileSystemClient:
                             "path": str(item),
                             "type": "directory" if item.is_dir() else "file",
                             "size": stat.st_size if item.is_file() else None,
-                            "modified": datetime.fromtimestamp(
-                                stat.st_mtime
-                            ).isoformat(),
+                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                             "permissions": oct(stat.st_mode)[-3:],
                         }
                     )
@@ -455,12 +452,8 @@ class FileSystemClient:
                                     {
                                         "name": item.name,
                                         "path": str(item),
-                                        "type": "directory"
-                                        if item.is_dir()
-                                        else "file",
-                                        "size": stat.st_size
-                                        if item.is_file()
-                                        else None,
+                                        "type": "directory" if item.is_dir() else "file",
+                                        "size": stat.st_size if item.is_file() else None,
                                         "modified": datetime.fromtimestamp(
                                             stat.st_mtime
                                         ).isoformat(),
@@ -555,12 +548,8 @@ class FileSystemClient:
                                             {
                                                 "name": item.name,
                                                 "path": str(item),
-                                                "type": "directory"
-                                                if item.is_dir()
-                                                else "file",
-                                                "size": stat.st_size
-                                                if item.is_file()
-                                                else None,
+                                                "type": "directory" if item.is_dir() else "file",
+                                                "size": stat.st_size if item.is_file() else None,
                                                 "modified": datetime.fromtimestamp(
                                                     stat.st_mtime
                                                 ).isoformat(),
@@ -635,15 +624,11 @@ def read_file(file_path: str, encoding: str = "utf-8") -> str:
 
     except FileNotFoundError as e:
         logger.error(f"File not found in read_file: {e}")
-        error_response = error_handler.handle_file_operation_error(
-            str(e), "read", file_path
-        )
+        error_response = error_handler.handle_file_operation_error(str(e), "read", file_path)
         return safe_json_dumps(error_response)
     except ValueError as e:
         logger.error(f"Validation error in read_file: {e}")
-        error_response = error_handler.handle_validation_error(
-            str(e), "file_path", file_path
-        )
+        error_response = error_handler.handle_validation_error(str(e), "file_path", file_path)
         return safe_json_dumps(error_response)
     except Exception as e:
         logger.error(f"Unexpected error in read_file: {e}")
@@ -707,9 +692,7 @@ def write_file(
 
 
 @mcp.tool()
-def list_directory(
-    dir_path: str, include_hidden: bool = False, recursive: bool = False
-) -> str:
+def list_directory(dir_path: str, include_hidden: bool = False, recursive: bool = False) -> str:
     """
     List the contents of a directory.
 
@@ -779,9 +762,7 @@ def search_files(
 
 
 @mcp.tool()
-def search_files_system_wide(
-    pattern: str, include_hidden: bool = False, max_depth: int = 3
-) -> str:
+def search_files_system_wide(pattern: str, include_hidden: bool = False, max_depth: int = 3) -> str:
     """
     Search for files system-wide within allowed directories.
 
@@ -795,9 +776,7 @@ def search_files_system_wide(
     """
     try:
         validate_non_empty(pattern, "pattern")
-        result = file_client.search_files_system_wide(
-            pattern, include_hidden, max_depth
-        )
+        result = file_client.search_files_system_wide(pattern, include_hidden, max_depth)
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error in search_files_system_wide: {e}")

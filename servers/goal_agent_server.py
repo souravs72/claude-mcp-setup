@@ -5,36 +5,36 @@ Manages goals, tasks, and execution plans with PostgreSQL persistence and Redis 
 Goals and plans are stored in PostgreSQL for durability, with Redis for temporary caching
 """
 
+import atexit
 import json
 import sys
-import atexit
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import wraps
-import threading
 
 from mcp.server.fastmcp import FastMCP
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
+from servers.base_client import handle_errors
 from servers.config import (
-    load_env_file,
+    ConfigurationError,
     GoalAgentConfig,
     PostgresConfig,
+    load_env_file,
     validate_config,
-    ConfigurationError,
 )
-from servers.base_client import handle_errors
 from servers.database import DatabaseManager
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -114,6 +114,7 @@ class CacheLayer:
         if enabled:
             try:
                 import redis
+
                 from servers.config import RedisConfig
 
                 # Initialize Redis with configuration
@@ -343,9 +344,7 @@ class GoalAgent:
         return goal
 
     @with_lock
-    def break_down_goal(
-        self, goal_id: str, subtasks: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def break_down_goal(self, goal_id: str, subtasks: list[dict[str, Any]]) -> dict[str, Any]:
         """Break down a goal into executable subtasks and persist to database."""
         goal = self.db.get_goal(goal_id)
         if not goal:
@@ -531,8 +530,7 @@ class GoalAgent:
 
                 # Check if all dependencies are completed
                 dependencies_met = all(
-                    (dep_task := self.db.get_task(dep_id))
-                    and dep_task.status == "completed"
+                    (dep_task := self.db.get_task(dep_id)) and dep_task.status == "completed"
                     for dep_id in task.dependencies
                 )
 
@@ -614,8 +612,7 @@ class GoalAgent:
 
                 for task in remaining_tasks[:]:
                     dependencies_met = all(
-                        dep_id in completed_task_ids
-                        or dep_id not in [t.id for t in tasks]
+                        dep_id in completed_task_ids or dep_id not in [t.id for t in tasks]
                         for dep_id in task.dependencies
                     )
 
@@ -672,23 +669,17 @@ class GoalAgent:
             result = update.get("result")
 
             if not task_id or not status:
-                results["failed"].append(
-                    {"task_id": task_id, "error": "Missing task_id or status"}
-                )
+                results["failed"].append({"task_id": task_id, "error": "Missing task_id or status"})
                 continue
 
-            future = self.executor.submit(
-                self.update_task_status, task_id, status, result
-            )
+            future = self.executor.submit(self.update_task_status, task_id, status, result)
             futures[future] = task_id
 
         for future in as_completed(futures):
             task_id = futures[future]
             try:
                 updated_task = future.result()
-                results["successful"].append(
-                    {"task_id": task_id, "status": updated_task["status"]}
-                )
+                results["successful"].append({"task_id": task_id, "status": updated_task["status"]})
             except Exception as e:
                 results["failed"].append({"task_id": task_id, "error": str(e)})
                 logger.error(f"Failed to update {task_id}: {e}")
@@ -1051,9 +1042,7 @@ def update_goal(
     repos_list = json.loads(repos) if repos else None
     metadata_dict = json.loads(metadata) if metadata else None
 
-    result = agent.update_goal(
-        goal_id, description, priority, status, repos_list, metadata_dict
-    )
+    result = agent.update_goal(goal_id, description, priority, status, repos_list, metadata_dict)
 
     result["_persistence"] = {
         "database": "PostgreSQL",

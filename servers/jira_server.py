@@ -7,28 +7,28 @@ Provides integration with Jira via REST API
 import json
 import sys
 import time
-from pathlib import Path
-from typing import Optional, List, Dict
 from datetime import datetime
-from requests.auth import HTTPBasicAuth
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
+from requests.auth import HTTPBasicAuth
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.logging_config import (
-    setup_logging,
-    log_server_startup,
-    log_server_shutdown,
-)
-from servers.config import (
-    load_env_file,
-    JiraConfig,
-    validate_config,
-    ConfigurationError,
-)
 from servers.base_client import BaseClient, handle_errors
+from servers.config import (
+    ConfigurationError,
+    JiraConfig,
+    load_env_file,
+    validate_config,
+)
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -82,9 +82,7 @@ class JiraClient(BaseClient):
     def _verify_agile_api(self) -> bool:
         """Check if Agile API is available."""
         try:
-            self._make_jira_request(
-                "GET", "/rest/agile/1.0/board", params={"maxResults": 1}
-            )
+            self._make_jira_request("GET", "/rest/agile/1.0/board", params={"maxResults": 1})
             logger.info("Agile API is available")
             return True
         except Exception as e:
@@ -120,9 +118,7 @@ class JiraClient(BaseClient):
                 return " | ".join(error_data["errorMessages"])
 
             if "errors" in error_data and error_data["errors"]:
-                errors = [
-                    f"{field}: {msg}" for field, msg in error_data["errors"].items()
-                ]
+                errors = [f"{field}: {msg}" for field, msg in error_data["errors"].items()]
                 return " | ".join(errors)
 
             return error_data.get("message", response.text[:500])
@@ -240,9 +236,7 @@ class JiraClient(BaseClient):
         if fields:
             params["fields"] = ",".join(fields)
 
-        response = self._make_jira_request(
-            "GET", f"/rest/api/3/issue/{issue_key}", params=params
-        )
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}", params=params)
         data = response.json()
 
         logger.info(f"Retrieved issue: {issue_key}")
@@ -426,9 +420,7 @@ class JiraClient(BaseClient):
         logger.debug(f"Issue creation payload: {json.dumps(payload, indent=2)}")
 
         try:
-            response = self._make_jira_request(
-                "POST", "/rest/api/3/issue", json=payload
-            )
+            response = self._make_jira_request("POST", "/rest/api/3/issue", json=payload)
             data = response.json()
 
             logger.debug(f"Create response: {json.dumps(data, indent=2)}")
@@ -454,9 +446,7 @@ class JiraClient(BaseClient):
             }
 
         except Exception as e:
-            logger.error(
-                f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}"
-            )
+            logger.error(f"Failed to create issue. Payload: {json.dumps(payload, indent=2)}")
             logger.error(f"Error: {str(e)}")
             raise
 
@@ -500,9 +490,7 @@ class JiraClient(BaseClient):
         payload = {"issueUpdates": issue_updates}
 
         try:
-            response = self._make_jira_request(
-                "POST", "/rest/api/3/issue/bulk", json=payload
-            )
+            response = self._make_jira_request("POST", "/rest/api/3/issue/bulk", json=payload)
             data = response.json()
 
             successful = len(data.get("issues", []))
@@ -536,9 +524,7 @@ class JiraClient(BaseClient):
         payload = {"fields": fields}
 
         try:
-            self._make_jira_request(
-                "PUT", f"/rest/api/3/issue/{issue_key}", json=payload
-            )
+            self._make_jira_request("PUT", f"/rest/api/3/issue/{issue_key}", json=payload)
             logger.info(f"Updated issue: {issue_key}")
             return True
 
@@ -587,18 +573,14 @@ class JiraClient(BaseClient):
         payload = {"transition": {"id": transition_id}}
 
         if comment:
-            payload["update"] = {
-                "comment": [{"add": {"body": self._format_description(comment)}}]
-            }
+            payload["update"] = {"comment": [{"add": {"body": self._format_description(comment)}}]}
 
         if fields:
             payload["fields"] = fields
 
         logger.debug(f"Transition payload: {json.dumps(payload, indent=2)}")
 
-        self._make_jira_request(
-            "POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload
-        )
+        self._make_jira_request("POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload)
 
         logger.info(f"Transitioned issue: {issue_key}")
         return True
@@ -615,9 +597,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching transitions for: {issue_key}")
 
-        response = self._make_jira_request(
-            "GET", f"/rest/api/3/issue/{issue_key}/transitions"
-        )
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/transitions")
         data = response.json()
 
         transitions = data.get("transitions", [])
@@ -625,9 +605,7 @@ class JiraClient(BaseClient):
 
         return transitions
 
-    def add_comment(
-        self, issue_key: str, comment: str, rich_text: bool = False
-    ) -> Dict:
+    def add_comment(self, issue_key: str, comment: str, rich_text: bool = False) -> Dict:
         """
         Add a comment to an issue.
 
@@ -663,9 +641,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching comments for: {issue_key}")
 
-        response = self._make_jira_request(
-            "GET", f"/rest/api/3/issue/{issue_key}/comment"
-        )
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/comment")
         data = response.json()
 
         comments = data.get("comments", [])
@@ -730,9 +706,7 @@ class JiraClient(BaseClient):
 
         payload = {"accountId": account_id}
 
-        self._make_jira_request(
-            "PUT", f"/rest/api/3/issue/{issue_key}/assignee", json=payload
-        )
+        self._make_jira_request("PUT", f"/rest/api/3/issue/{issue_key}/assignee", json=payload)
 
         logger.info(f"Assigned issue {issue_key}")
         return True
@@ -749,9 +723,7 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Fetching watchers for: {issue_key}")
 
-        response = self._make_jira_request(
-            "GET", f"/rest/api/3/issue/{issue_key}/watchers"
-        )
+        response = self._make_jira_request("GET", f"/rest/api/3/issue/{issue_key}/watchers")
         data = response.json()
 
         logger.info(f"Retrieved watchers for {issue_key}")
@@ -770,18 +742,14 @@ class JiraClient(BaseClient):
         """
         logger.debug(f"Adding watcher to {issue_key}")
 
-        self._make_jira_request(
-            "POST", f"/rest/api/3/issue/{issue_key}/watchers", json=account_id
-        )
+        self._make_jira_request("POST", f"/rest/api/3/issue/{issue_key}/watchers", json=account_id)
 
         logger.info(f"Added watcher to {issue_key}")
         return True
 
     # Sprint and Board Management Methods
 
-    def get_boards(
-        self, project_key: Optional[str] = None, max_results: int = 50
-    ) -> List[Dict]:
+    def get_boards(self, project_key: Optional[str] = None, max_results: int = 50) -> List[Dict]:
         """
         Get boards, optionally filtered by project.
 
@@ -801,9 +769,7 @@ class JiraClient(BaseClient):
         if project_key:
             params["projectKeyOrId"] = project_key
 
-        response = self._make_jira_request(
-            "GET", "/rest/agile/1.0/board", params=params
-        )
+        response = self._make_jira_request("GET", "/rest/agile/1.0/board", params=params)
         data = response.json()
 
         boards = data.get("values", [])
@@ -895,9 +861,7 @@ class JiraClient(BaseClient):
 
         payload = {"issues": issue_keys}
 
-        self._make_jira_request(
-            "POST", f"/rest/agile/1.0/sprint/{sprint_id}/issue", json=payload
-        )
+        self._make_jira_request("POST", f"/rest/agile/1.0/sprint/{sprint_id}/issue", json=payload)
 
         logger.info(f"Added issues to sprint {sprint_id}")
         return True
@@ -1105,9 +1069,7 @@ def jira_get_create_metadata(project_key: str, issue_type_id: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def jira_check_story_points_requirement(
-    project_key: str, issue_type: str = "Story"
-) -> str:
+def jira_check_story_points_requirement(project_key: str, issue_type: str = "Story") -> str:
     """
     Check if story points are required for a specific issue type in a project.
 
@@ -1180,9 +1142,7 @@ def jira_check_story_points_requirement(
                                             "field_id": field_id,
                                             "field_name": field_data.get("name"),
                                             "required": is_required,
-                                            "field_type": field_data.get(
-                                                "schema", {}
-                                            ).get("type"),
+                                            "field_type": field_data.get("schema", {}).get("type"),
                                         }
                                     )
 
@@ -1191,9 +1151,7 @@ def jira_check_story_points_requirement(
                                         {
                                             "field_id": field_id,
                                             "field_name": field_data.get("name"),
-                                            "field_type": field_data.get(
-                                                "schema", {}
-                                            ).get("type"),
+                                            "field_type": field_data.get("schema", {}).get("type"),
                                         }
                                     )
 
@@ -1201,9 +1159,7 @@ def jira_check_story_points_requirement(
             {
                 "project_key": project_key,
                 "issue_type": issue_type,
-                "story_points_required": any(
-                    field["required"] for field in story_points_fields
-                ),
+                "story_points_required": any(field["required"] for field in story_points_fields),
                 "story_points_fields": story_points_fields,
                 "all_required_fields": required_fields,
                 "suggestion": "Use the story_points parameter when creating issues if story points are required.",
@@ -1354,10 +1310,7 @@ def jira_create_issue(
 
         # Check for common Jira errors and provide helpful suggestions
         if "required field" in error_msg.lower():
-            if (
-                "story points" in error_msg.lower()
-                or "customfield" in error_msg.lower()
-            ):
+            if "story points" in error_msg.lower() or "customfield" in error_msg.lower():
                 return json.dumps(
                     {
                         "error": f"Story points are required for this issue type: {error_msg}",
@@ -1426,11 +1379,7 @@ def jira_create_issues_bulk(issues: str) -> str:
 
             # Validate story points value
             story_points = issue["story_points"]
-            if (
-                not isinstance(story_points, int)
-                or story_points < 1
-                or story_points > 100
-            ):
+            if not isinstance(story_points, int) or story_points < 1 or story_points > 100:
                 return json.dumps(
                     {
                         "error": f"Issue {i+1} has invalid story_points value: {story_points}. Must be an integer between 1 and 100.",
@@ -1516,9 +1465,7 @@ def jira_transition_issue(
         return json.dumps({"error": "Jira client not initialized"})
 
     fields_dict = json.loads(fields) if fields else None
-    result = jira_client.transition_issue(
-        issue_key, transition_id, comment, fields_dict
-    )
+    result = jira_client.transition_issue(issue_key, transition_id, comment, fields_dict)
     return json.dumps({"success": result})
 
 
@@ -1583,9 +1530,7 @@ def jira_get_comments(issue_key: str) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def jira_link_issues(
-    inward_issue: str, outward_issue: str, link_type: str = "Relates"
-) -> str:
+def jira_link_issues(inward_issue: str, outward_issue: str, link_type: str = "Relates") -> str:
     """
     Create a link between two Jira issues.
 
