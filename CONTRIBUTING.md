@@ -1,6 +1,6 @@
 # Contributing to Claude MCP Setup
 
-Thank you for your interest in contributing to Claude MCP Setup! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Claude MCP Setup! This is a personal project by Sourav Singh, and contributions from the community are welcome and appreciated.
 
 ## Table of Contents
 
@@ -50,6 +50,7 @@ make setup
 ```
 
 This will:
+
 - Create a virtual environment
 - Install all required dependencies
 - Set up the development environment
@@ -113,6 +114,7 @@ git commit -m "feat: add new MCP server for X"
 ```
 
 Use conventional commit messages:
+
 - `feat:` for new features
 - `fix:` for bug fixes
 - `docs:` for documentation changes
@@ -173,6 +175,7 @@ mcpctl test --verbose
 ### Test Coverage
 
 We aim for good test coverage. When adding new features:
+
 - Write unit tests for new functions
 - Add integration tests for server functionality
 - Test error conditions and edge cases
@@ -189,6 +192,7 @@ We aim for good test coverage. When adding new features:
 ### Files to Update
 
 When adding new features, consider updating:
+
 - `README.md` - Overview and quick start
 - `SETUP.md` - Detailed setup instructions
 - Server-specific documentation
@@ -205,6 +209,7 @@ When adding new features, consider updating:
 ### Issue Templates
 
 Use the appropriate issue template:
+
 - **Bug Report**: For unexpected behavior
 - **Feature Request**: For new functionality
 - **Documentation**: For documentation improvements
@@ -232,20 +237,24 @@ Use the appropriate issue template:
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Tests pass locally
 - [ ] New tests added for new functionality
 - [ ] Manual testing completed
 
 ## Checklist
+
 - [ ] Code follows style guidelines
 - [ ] Self-review completed
 - [ ] Documentation updated
@@ -294,10 +303,10 @@ mcp = FastMCP("server-name")
 def tool_name(param: str) -> str:
     """
     Tool description.
-    
+
     Args:
         param: Parameter description
-        
+
     Returns:
         Result description
     """
@@ -325,8 +334,13 @@ if __name__ == "__main__":
 ## Recognition
 
 Contributors will be recognized in:
-- CONTRIBUTORS.md file
+
 - Release notes
 - Project documentation
+- GitHub contributors list
+
+## Project Ownership
+
+This is a personal project by Sourav Singh. While contributions are welcome and appreciated, the project direction and final decisions remain with the project owner.
 
 Thank you for contributing to Claude MCP Setup! 🚀

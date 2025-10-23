@@ -1,5 +1,7 @@
 # Security Policy
 
+This is a personal project by Sourav Singh. While contributions are welcome, security vulnerabilities should be reported directly to the project owner.
+
 ## Supported Versions
 
 We provide security updates for the following versions:
@@ -19,9 +21,10 @@ Security vulnerabilities should be reported privately to prevent exploitation.
 
 ### 2. Report via Email
 
-Send an email to: **security@your-domain.com** (replace with your actual email)
+Send an email to: **souravs72@github.com** or create a private security advisory on GitHub
 
 Include the following information:
+
 - Description of the vulnerability
 - Steps to reproduce the issue
 - Potential impact
@@ -35,26 +38,29 @@ Include the following information:
 
 ### 4. What to Expect
 
-- We will acknowledge receipt of your report
-- We will investigate the vulnerability
-- We will provide regular updates on our progress
-- We will credit you in our security advisories (unless you prefer to remain anonymous)
+- I will acknowledge receipt of your report
+- I will investigate the vulnerability
+- I will provide regular updates on progress
+- I will credit you in security advisories (unless you prefer to remain anonymous)
 
 ## Security Best Practices
 
 ### For Users
 
 1. **Keep Dependencies Updated**
+
    ```bash
    pip install --upgrade -r requirements.txt
    ```
 
 2. **Use Environment Variables for Secrets**
+
    - Never commit API keys or tokens to version control
    - Use `config/mcp_settings.json.template` as a reference
    - Keep your actual `mcp_settings.json` in `.gitignore`
 
 3. **Restrict File System Access**
+
    - The file and bash servers have built-in security restrictions
    - Only allow access to necessary directories
    - Review allowed paths in your configuration
@@ -66,11 +72,13 @@ Include the following information:
 ### For Developers
 
 1. **Input Validation**
+
    - Always validate user inputs
    - Use type hints and validation libraries
    - Sanitize file paths and commands
 
 2. **Error Handling**
+
    - Don't expose sensitive information in error messages
    - Log errors appropriately
    - Use structured error responses
@@ -85,16 +93,19 @@ Include the following information:
 ### Built-in Protections
 
 1. **Path Validation**
+
    - Restricted directory access
    - Path traversal protection
    - File system boundary enforcement
 
 2. **Command Validation**
+
    - Dangerous command blocking
    - Command timeout limits
    - Working directory restrictions
 
 3. **API Security**
+
    - Input sanitization
    - Rate limiting (where applicable)
    - Authentication token validation
@@ -107,6 +118,7 @@ Include the following information:
 ### Configuration Security
 
 1. **Environment Variables**
+
    - Sensitive data stored in environment variables
    - Template configuration for easy setup
    - Clear separation of secrets and code
@@ -121,11 +133,13 @@ Include the following information:
 ### How We Handle Security Updates
 
 1. **Critical Vulnerabilities**
+
    - Immediate patch release
    - Security advisory published
    - Users notified via GitHub releases
 
 2. **High Priority Issues**
+
    - Patch within 7 days
    - Security advisory published
    - Regular updates provided
@@ -163,13 +177,13 @@ Include the following information:
 
 ## Contact Information
 
-- **Security Email**: security@your-domain.com
+- **Security Email**: souravs72@github.com
 - **General Issues**: Use GitHub Issues
 - **Documentation**: Check project README and docs
 
 ## Acknowledgments
 
-We appreciate the security researchers and community members who help keep this project secure. Responsible disclosure helps us maintain the security and integrity of our software.
+I appreciate the security researchers and community members who help keep this project secure. Responsible disclosure helps maintain the security and integrity of this software.
 
 ---
 
