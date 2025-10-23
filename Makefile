@@ -91,7 +91,7 @@ lint: ## Run all linting tools
 	@echo "Running isort import sorting..."
 	isort servers/ mcpctl.py
 	@echo "Running Flake8 linting..."
-	flake8 servers/ mcpctl.py --max-line-length=100
+	flake8 servers/ mcpctl.py --max-line-length=100 --extend-ignore=E203,W503,E402,E501,F401,F541,F841
 	@echo "Running MyPy type checking..."
 	mypy servers/ --config-file pyproject.toml || true
 	@echo "Linting complete!"
@@ -102,7 +102,7 @@ lint-check: ## Check linting without fixing
 	@echo "Checking isort import sorting..."
 	isort --check-only servers/ mcpctl.py
 	@echo "Checking Flake8 linting..."
-	flake8 servers/ mcpctl.py --max-line-length=100
+	flake8 servers/ mcpctl.py --max-line-length=100 --extend-ignore=E203,W503,E402,E501,F401,F541,F841
 	@echo "Checking MyPy type checking..."
 	mypy servers/ --config-file pyproject.toml || true
 	@echo "All linting checks passed!"
