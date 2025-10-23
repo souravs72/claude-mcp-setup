@@ -47,7 +47,7 @@ repos:
       - id: mypy
         additional_dependencies: [types-all]
         args: [--config-file=pyproject.toml]
-        continue_on_failure: true
+        continue-on-error: true
 
   - repo: local
     hooks:
