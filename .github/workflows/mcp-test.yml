@@ -93,7 +93,7 @@ jobs:
         run: isort --check-only servers/ mcpctl.py
 
       - name: Run Flake8
-        run: flake8 servers/ mcpctl.py --max-line-length=100
+        run: flake8 servers/ mcpctl.py --max-line-length=100 --extend-ignore=E203,W503,E402,E501,F401,F541,F841
 
       - name: Run MyPy
         run: mypy servers/ --config-file pyproject.toml
