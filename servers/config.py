@@ -64,11 +64,7 @@ class BaseConfig:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
-        return {
-            key: value
-            for key, value in self.__dict__.items()
-            if not key.startswith("_")
-        }
+        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
 
 
 @dataclass
@@ -79,15 +75,11 @@ class FrappeConfig(BaseConfig):
     api_key: str = field(default_factory=lambda: os.getenv("FRAPPE_API_KEY", ""))
     api_secret: str = field(default_factory=lambda: os.getenv("FRAPPE_API_SECRET", ""))
     timeout: int = field(default_factory=lambda: int(os.getenv("FRAPPE_TIMEOUT", "30")))
-    max_retries: int = field(
-        default_factory=lambda: int(os.getenv("FRAPPE_MAX_RETRIES", "3"))
-    )
+    max_retries: int = field(default_factory=lambda: int(os.getenv("FRAPPE_MAX_RETRIES", "3")))
     pool_connections: int = field(
         default_factory=lambda: int(os.getenv("FRAPPE_POOL_CONNECTIONS", "5"))
     )
-    pool_maxsize: int = field(
-        default_factory=lambda: int(os.getenv("FRAPPE_POOL_MAXSIZE", "10"))
-    )
+    pool_maxsize: int = field(default_factory=lambda: int(os.getenv("FRAPPE_POOL_MAXSIZE", "10")))
 
     def __post_init__(self) -> None:
         self.site_url = self.site_url.rstrip("/")
@@ -102,12 +94,8 @@ class FrappeConfig(BaseConfig):
 class GoalAgentConfig(BaseConfig):
     """Goal agent configuration."""
 
-    max_workers: int = field(
-        default_factory=lambda: int(os.getenv("GOAL_AGENT_MAX_WORKERS", "5"))
-    )
-    timeout: int = field(
-        default_factory=lambda: int(os.getenv("GOAL_AGENT_TIMEOUT", "30"))
-    )
+    max_workers: int = field(default_factory=lambda: int(os.getenv("GOAL_AGENT_MAX_WORKERS", "5")))
+    timeout: int = field(default_factory=lambda: int(os.getenv("GOAL_AGENT_TIMEOUT", "30")))
     cache_enabled: bool = field(
         default_factory=lambda: os.getenv("CACHE_ENABLED", "true").lower() == "true"
     )
@@ -120,17 +108,11 @@ class GoalAgentConfig(BaseConfig):
 class GitHubConfig(BaseConfig):
     """GitHub server configuration."""
 
-    token: str = field(
-        default_factory=lambda: os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", "")
-    )
+    token: str = field(default_factory=lambda: os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", ""))
     timeout: int = field(default_factory=lambda: int(os.getenv("GITHUB_TIMEOUT", "30")))
-    max_retries: int = field(
-        default_factory=lambda: int(os.getenv("GITHUB_MAX_RETRIES", "3"))
-    )
+    max_retries: int = field(default_factory=lambda: int(os.getenv("GITHUB_MAX_RETRIES", "3")))
     # ADD THIS FIELD:
-    default_branch: str = field(
-        default_factory=lambda: os.getenv("GITHUB_DEFAULT_BRANCH", "main")
-    )
+    default_branch: str = field(default_factory=lambda: os.getenv("GITHUB_DEFAULT_BRANCH", "main"))
 
     def __post_init__(self) -> None:
         if self.token and not self.token.startswith(("ghp_", "github_pat_")):
@@ -151,9 +133,7 @@ class JiraConfig(BaseConfig):
     api_token: str = field(default_factory=lambda: os.getenv("JIRA_API_TOKEN", ""))
     project_key: str = field(default_factory=lambda: os.getenv("JIRA_PROJECT_KEY", ""))
     timeout: int = field(default_factory=lambda: int(os.getenv("JIRA_TIMEOUT", "30")))
-    max_retries: int = field(
-        default_factory=lambda: int(os.getenv("JIRA_MAX_RETRIES", "3"))
-    )
+    max_retries: int = field(default_factory=lambda: int(os.getenv("JIRA_MAX_RETRIES", "3")))
     rate_limit_delay: float = field(
         default_factory=lambda: float(os.getenv("JIRA_RATE_LIMIT_DELAY", "0.5"))
     )
@@ -176,13 +156,9 @@ class InternetConfig(BaseConfig):
     """Internet/search server configuration."""
 
     google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
-    search_engine_id: str = field(
-        default_factory=lambda: os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
-    )
+    search_engine_id: str = field(default_factory=lambda: os.getenv("GOOGLE_SEARCH_ENGINE_ID", ""))
     timeout: int = field(default_factory=lambda: int(os.getenv("GOOGLE_TIMEOUT", "15")))
-    max_retries: int = field(
-        default_factory=lambda: int(os.getenv("GOOGLE_MAX_RETRIES", "3"))
-    )
+    max_retries: int = field(default_factory=lambda: int(os.getenv("GOOGLE_MAX_RETRIES", "3")))
 
     def get_required_fields(self) -> list[str]:
         return ["google_api_key", "search_engine_id"]
@@ -197,12 +173,9 @@ class RedisConfig(BaseConfig):
     db: int = field(default_factory=lambda: int(os.getenv("REDIS_DB", "0")))
     password: str | None = field(default_factory=lambda: os.getenv("REDIS_PASSWORD"))
     decode_responses: bool = field(
-        default_factory=lambda: os.getenv("REDIS_DECODE_RESPONSES", "true").lower()
-        == "true"
+        default_factory=lambda: os.getenv("REDIS_DECODE_RESPONSES", "true").lower() == "true"
     )
-    socket_timeout: int = field(
-        default_factory=lambda: int(os.getenv("REDIS_SOCKET_TIMEOUT", "5"))
-    )
+    socket_timeout: int = field(default_factory=lambda: int(os.getenv("REDIS_SOCKET_TIMEOUT", "5")))
     socket_connect_timeout: int = field(
         default_factory=lambda: int(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT", "5"))
     )
@@ -210,8 +183,7 @@ class RedisConfig(BaseConfig):
         default_factory=lambda: int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
     )
     retry_on_timeout: bool = field(
-        default_factory=lambda: os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower()
-        == "true"
+        default_factory=lambda: os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower() == "true"
     )
     health_check_interval: int = field(
         default_factory=lambda: int(os.getenv("REDIS_HEALTH_CHECK_INTERVAL", "30"))
@@ -230,15 +202,9 @@ class PostgresConfig(BaseConfig):
     database: str = field(default_factory=lambda: os.getenv("POSTGRES_DB", "mcp_goals"))
     user: str = field(default_factory=lambda: os.getenv("POSTGRES_USER", "postgres"))
     password: str = field(default_factory=lambda: os.getenv("POSTGRES_PASSWORD", ""))
-    pool_size: int = field(
-        default_factory=lambda: int(os.getenv("POSTGRES_POOL_SIZE", "10"))
-    )
-    max_overflow: int = field(
-        default_factory=lambda: int(os.getenv("POSTGRES_MAX_OVERFLOW", "20"))
-    )
-    ssl_mode: str = field(
-        default_factory=lambda: os.getenv("POSTGRES_SSL_MODE", "prefer")
-    )
+    pool_size: int = field(default_factory=lambda: int(os.getenv("POSTGRES_POOL_SIZE", "10")))
+    max_overflow: int = field(default_factory=lambda: int(os.getenv("POSTGRES_MAX_OVERFLOW", "20")))
+    ssl_mode: str = field(default_factory=lambda: os.getenv("POSTGRES_SSL_MODE", "prefer"))
 
     def get_connection_string(self) -> str:
         """Get PostgreSQL connection string."""
@@ -253,12 +219,8 @@ class PostgresConfig(BaseConfig):
 class CacheServerConfig(BaseConfig):
     """Cache server configuration for goal agent."""
 
-    url: str = field(
-        default_factory=lambda: os.getenv("CACHE_SERVER_URL", "http://localhost:8001")
-    )
-    timeout: int = field(
-        default_factory=lambda: int(os.getenv("CACHE_SERVER_TIMEOUT", "5"))
-    )
+    url: str = field(default_factory=lambda: os.getenv("CACHE_SERVER_URL", "http://localhost:8001"))
+    timeout: int = field(default_factory=lambda: int(os.getenv("CACHE_SERVER_TIMEOUT", "5")))
     enabled: bool = field(
         default_factory=lambda: os.getenv("CACHE_ENABLED", "true").lower() == "true"
     )
@@ -292,9 +254,7 @@ def validate_config(config: BaseConfig, logger: Any = None) -> None:
     is_valid, errors = config.validate()
 
     if not is_valid:
-        error_msg = "Configuration validation failed:\n" + "\n".join(
-            f"  - {err}" for err in errors
-        )
+        error_msg = "Configuration validation failed:\n" + "\n".join(f"  - {err}" for err in errors)
         if logger:
             logger.error(error_msg)
         raise ConfigurationError(error_msg)
