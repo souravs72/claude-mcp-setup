@@ -31,4 +31,3 @@ echo ""
 
 # Start dashboard
 python servers/dashboard_server.py
-

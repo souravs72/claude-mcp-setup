@@ -6,8 +6,9 @@ Stops all running MCP server processes gracefully.
 Excludes LSP servers which are managed by IDEs.
 """
 import time
-import psutil
 from pathlib import Path
+
+import psutil
 
 # Get the project root directory
 project_root = Path(__file__).parent.parent
@@ -98,7 +99,9 @@ def stop_servers() -> None:
             pass
 
     if still_running:
-        print(f"\n⚠  {len(still_running)} process(es) still running, forcing termination...")
+        print(
+            f"\n⚠  {len(still_running)} process(es) still running, forcing termination..."
+        )
         for server in still_running:
             try:
                 print(f"  → Force killing {server['name']} (PID: {server['pid']})")

@@ -21,10 +21,18 @@ class CustomFormatter(logging.Formatter):
     reset = "\x1b[0m"
 
     FORMATS = {
-        logging.DEBUG: grey + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s" + reset,
-        logging.INFO: blue + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s" + reset,
-        logging.WARNING: yellow + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s" + reset,
-        logging.ERROR: red + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s" + reset,
+        logging.DEBUG: grey
+        + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+        + reset,
+        logging.INFO: blue
+        + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+        + reset,
+        logging.WARNING: yellow
+        + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+        + reset,
+        logging.ERROR: red
+        + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+        + reset,
         logging.CRITICAL: bold_red
         + "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
         + reset,
@@ -76,7 +84,8 @@ def setup_logging(
         console_handler.setFormatter(CustomFormatter())
     else:
         simple_formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
         console_handler.setFormatter(simple_formatter)
 
@@ -101,7 +110,9 @@ def setup_logging(
     return logger
 
 
-def log_server_startup(logger: logging.Logger, server_name: str, config: dict[str, Any]) -> None:
+def log_server_startup(
+    logger: logging.Logger, server_name: str, config: dict[str, Any]
+) -> None:
     """Log server startup information."""
     logger.info("=" * 70)
     logger.info(f"{server_name} Starting")
@@ -111,7 +122,10 @@ def log_server_startup(logger: logging.Logger, server_name: str, config: dict[st
 
     for key, value in config.items():
         # Mask sensitive information
-        if any(secret in key.lower() for secret in ["token", "secret", "password", "key", "api"]):
+        if any(
+            secret in key.lower()
+            for secret in ["token", "secret", "password", "key", "api"]
+        ):
             logger.info(f"{key}: {'*' * 8}")
         else:
             logger.info(f"{key}: {value}")

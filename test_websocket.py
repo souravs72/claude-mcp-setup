@@ -4,9 +4,10 @@ Test WebSocket connection to the dashboard server.
 """
 
 import asyncio
-import websockets
 import json
 import sys
+
+import websockets
 
 
 async def test_websocket():

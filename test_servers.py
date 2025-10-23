@@ -6,7 +6,7 @@ Tests all servers for proper initialization and basic functionality
 
 import sys
 from pathlib import Path
-from typing import Tuple, List
+from typing import List, Tuple
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -56,8 +56,8 @@ def test_configurations() -> Tuple[bool, List[str]]:
     from servers.config import (
         FrappeConfig,
         GitHubConfig,
-        JiraConfig,
         InternetConfig,
+        JiraConfig,
         load_env_file,
     )
 

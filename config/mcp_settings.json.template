@@ -13,7 +13,7 @@
       "args": ["/path/to/your/project/servers/bash_server.py"]
     },
     "github-server": {
-      "command": "/path/to/your/project/mcp-env/bin/python", 
+      "command": "/path/to/your/project/mcp-env/bin/python",
       "args": ["/path/to/your/project/servers/github_server.py"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
@@ -24,7 +24,7 @@
       "args": ["/path/to/your/project/servers/frappe_server.py"],
       "env": {
         "FRAPPE_SITE_URL": "http://127.0.0.1:8005",
-        "FRAPPE_API_KEY": "your_frappe_api_key", 
+        "FRAPPE_API_KEY": "your_frappe_api_key",
         "FRAPPE_API_SECRET": "your_frappe_api_secret"
       }
     },
@@ -56,4 +56,3 @@
     }
   }
 }
-

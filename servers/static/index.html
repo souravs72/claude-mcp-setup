@@ -24,12 +24,12 @@
         .status-running { background-color: #10b981; }
         .status-stopped { background-color: #ef4444; }
         .status-warning { background-color: #f59e0b; }
-        
+
         .log-error { color: #ef4444; }
         .log-warning { color: #f59e0b; }
         .log-info { color: #6b7280; }
         .log-debug { color: #8b5cf6; }
-        
+
         /* Custom scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
@@ -259,9 +259,9 @@
                         <button onclick="confirmFlushRedis()" class="btn btn-danger">Flush All</button>
                     </div>
                 </div>
-                
+
                 <div class="mb-4">
-                    <input type="text" id="redis-search" placeholder="Search keys (use * for wildcards)" 
+                    <input type="text" id="redis-search" placeholder="Search keys (use * for wildcards)"
                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                            onkeyup="searchRedisKeys(event)">
                 </div>
@@ -565,7 +565,7 @@
 
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
-            
+
             console.log('Connecting to WebSocket:', wsUrl);
             updateStatusIndicator(false);
             document.getElementById('connection-status').textContent = 'Connecting...';
@@ -577,7 +577,7 @@
                 reconnectAttempts = 0;
                 updateStatusIndicator(true);
                 document.getElementById('connection-status').textContent = 'Connected (Live)';
-                
+
                 // Clear any pending reconnection attempts
                 if (reconnectTimeout) {
                     clearTimeout(reconnectTimeout);
@@ -603,7 +603,7 @@
                 console.log('✗ WebSocket disconnected');
                 updateStatusIndicator(false);
                 document.getElementById('connection-status').textContent = 'Disconnected';
-                
+
                 // Attempt to reconnect with exponential backoff
                 scheduleReconnect();
             };
@@ -617,7 +617,7 @@
             reconnectAttempts++;
             // Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), MAX_RECONNECT_DELAY);
-            
+
             console.log(`Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts})`);
             document.getElementById('connection-status').textContent = `Reconnecting in ${Math.ceil(delay / 1000)}s...`;
 
@@ -646,11 +646,11 @@
                     if (data.logs) {
                         renderLogs(data.logs);
                     }
-                    
+
                     // Update timestamp
                     if (timestamp) {
                         const date = new Date(timestamp);
-                        document.getElementById('last-update').textContent = 
+                        document.getElementById('last-update').textContent =
                             `Last update: ${date.toLocaleTimeString()}`;
                     }
                     break;
@@ -669,20 +669,20 @@
 
         // Store last known values to prevent flickering
         let lastKnownSystemCpu = '--';
-        
+
         function updateStatusCards(status) {
             // Always update: Server counts
-            document.getElementById('servers-running').textContent = 
+            document.getElementById('servers-running').textContent =
                 `${status.servers.running}/${status.servers.total}`;
-            
+
             // Always update: Redis key count and connection status
-            document.getElementById('redis-keys').textContent = 
-                status.redis.connected && status.redis.total_keys !== undefined 
-                    ? status.redis.total_keys 
+            document.getElementById('redis-keys').textContent =
+                status.redis.connected && status.redis.total_keys !== undefined
+                    ? status.redis.total_keys
                     : 'N/A';
-            document.getElementById('redis-status').textContent = 
+            document.getElementById('redis-status').textContent =
                 status.redis.connected ? 'Connected' : 'Disconnected';
-            
+
             // Only update system stats when included (every 1000ms)
             // Otherwise preserve last known value to prevent flickering
             if (status.system && status.system.cpu_percent !== undefined) {
@@ -693,9 +693,9 @@
 
         function updateGoalsCards(goalsData) {
             const summary = goalsData.summary;
-            document.getElementById('goals-active').textContent = 
+            document.getElementById('goals-active').textContent =
                 summary.goals_by_status.in_progress + summary.goals_by_status.pending;
-            document.getElementById('goals-status').textContent = 
+            document.getElementById('goals-status').textContent =
                 `${summary.total_goals} total`;
         }
 
@@ -717,23 +717,23 @@
                 const statusResponse = await fetch('/api/status');
                 const status = await statusResponse.json();
                 updateStatusCards(status);
-                
+
                 const serversResponse = await fetch('/api/servers');
                 const servers = await serversResponse.json();
                 renderServers(servers.servers);
-                
+
                 const goalsResponse = await fetch('/api/goals');
                 const goals = await goalsResponse.json();
                 updateGoalsCards({ summary: goals.summary });
-                
+
                 const logsResponse = await fetch('/api/logs?lines=30');
                 const logs = await logsResponse.json();
                 renderLogs(logs);
-                
+
                 const now = new Date();
-                document.getElementById('last-update').textContent = 
+                document.getElementById('last-update').textContent =
                     `Last update: ${now.toLocaleTimeString()} (HTTP)`;
-                
+
                 updateStatusIndicator(true);
             } catch (error) {
                 console.error('Failed to refresh data:', error);
@@ -744,15 +744,15 @@
         // Tab switching
         function switchTab(tab) {
             currentTab = tab;
-            
+
             // Update tab buttons
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-            
+
             // Update tab contents
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById(`tab-${tab}`).classList.add('active');
-            
+
             // Load tab-specific data
             if (tab === 'redis') {
                 loadRedisData();
@@ -763,13 +763,13 @@
                 loadEnvVariables();
             }
         }
-        
+
         // Load complete Redis tab data
         async function loadRedisData() {
             await loadRedisStats();
             await loadRedisKeys();
         }
-        
+
         // Load Redis statistics
         async function loadRedisStats() {
             try {
@@ -777,7 +777,7 @@
                 if (!response.ok) {
                     // 503 means Redis is not connected
                     if (response.status === 503) {
-                        document.getElementById('redis-stats').innerHTML = 
+                        document.getElementById('redis-stats').innerHTML =
                             '<div class="text-center text-yellow-400 py-8">⚠️ Redis not connected<br><span class="text-sm">Start the memory-cache server</span></div>';
                         return;
                     }
@@ -786,7 +786,7 @@
                 const redisStats = await response.json();
                 renderRedisStats(redisStats);
             } catch (error) {
-                document.getElementById('redis-stats').innerHTML = 
+                document.getElementById('redis-stats').innerHTML =
                     `<div class="text-center text-red-400 py-8">❌ Error loading Redis stats<br><span class="text-sm">${error.message}</span></div>`;
                 console.error('Failed to load Redis stats:', error);
             }
@@ -817,17 +817,17 @@
         // Toast notification
         function showToast(message, type = 'info') {
             console.log('Showing toast:', message, type);
-            
+
             const toast = document.getElementById('toast');
             const toastMessage = document.getElementById('toast-message');
-            
+
             if (!toast || !toastMessage) {
                 console.error('Toast elements not found!');
                 return;
             }
-            
+
             toastMessage.textContent = message;
-            
+
             // Add color based on type
             toast.className = 'fixed bottom-4 right-4 border rounded-lg p-4 shadow-lg min-w-64 max-w-md';
             if (type === 'success') {
@@ -841,9 +841,9 @@
             }
             toast.style.zIndex = '9999';
             toast.style.display = 'block';
-            
+
             console.log('Toast displayed');
-            
+
             // Auto-hide after delay
             const hideDelay = type === 'warning' ? 5000 : 3000;
             setTimeout(() => {
@@ -857,7 +857,7 @@
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
-            
+
             if (days > 0) return `${days}d ${hours}h`;
             if (hours > 0) return `${hours}h ${minutes}m`;
             return `${minutes}m`;
@@ -873,7 +873,7 @@
         function updateStatusIndicator(connected) {
             const indicator = document.getElementById('status-indicator');
             const statusText = document.getElementById('connection-status');
-            
+
             if (connected) {
                 indicator.classList.remove('status-stopped');
                 indicator.classList.add('status-running');
@@ -893,15 +893,15 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({action})
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.status === 'success') {
                     showToast(result.message, 'success');
                 } else {
                     showToast(result.message || 'Operation failed', 'error');
                 }
-                
+
                 setTimeout(refreshData, 1000);
             } catch (error) {
                 showToast(`Failed to ${action} server: ${error.message}`, 'error');
@@ -912,14 +912,14 @@
             if (action === 'stop' && !confirm('Are you sure you want to stop all servers?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/servers/control-all', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({action})
                 });
-                
+
                 const result = await response.json();
                 showToast(`Batch ${action} completed`, 'success');
                 setTimeout(refreshData, 2000);
@@ -931,10 +931,10 @@
         // Redis Functions
         async function loadRedisKeys(pattern = '*') {
             const container = document.getElementById('redis-keys-list');
-            
+
             try {
                 const response = await fetch(`/api/redis/keys?pattern=${encodeURIComponent(pattern)}&limit=100`);
-                
+
                 if (!response.ok) {
                     // Check if it's a Redis connection error (503)
                     if (response.status === 503) {
@@ -943,14 +943,14 @@
                     }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (!data.keys || data.keys.length === 0) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-4">📭 No keys found<br><span class="text-sm">Redis is empty or no keys match pattern</span></div>';
                     return;
                 }
-                
+
                 container.innerHTML = data.keys.map(key => `
                     <div class="bg-gray-700 rounded-lg p-3 flex justify-between items-center">
                         <div class="flex-1">
@@ -982,15 +982,15 @@
             try {
                 const response = await fetch(`/api/redis/key/${encodeURIComponent(key)}`);
                 const data = await response.json();
-                
+
                 currentViewKey = key;
                 document.getElementById('view-key-name').textContent = data.key;
                 document.getElementById('view-key-type').textContent = data.type;
-                document.getElementById('view-key-ttl').textContent = 
+                document.getElementById('view-key-ttl').textContent =
                     data.ttl === -1 ? 'No expiration' : data.ttl === -2 ? 'Expired' : `${data.ttl} seconds`;
-                document.getElementById('view-key-value').textContent = 
+                document.getElementById('view-key-value').textContent =
                     typeof data.value === 'object' ? JSON.stringify(data.value, null, 2) : data.value;
-                
+
                 showModal('viewKeyModal');
             } catch (error) {
                 showToast(`Failed to load key: ${error.message}`, 'error');
@@ -1001,12 +1001,12 @@
             const key = document.getElementById('new-key-name').value;
             const value = document.getElementById('new-key-value').value;
             const ttl = document.getElementById('new-key-ttl').value;
-            
+
             if (!key || !value) {
                 showToast('Key and value are required', 'error');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/redis/key', {
                     method: 'POST',
@@ -1017,7 +1017,7 @@
                         ttl: ttl ? parseInt(ttl) : null
                     })
                 });
-                
+
                 const result = await response.json();
                 showToast(result.message, 'success');
                 closeModal('addKeyModal');
@@ -1045,7 +1045,7 @@
                 const response = await fetch(`/api/redis/key/${encodeURIComponent(key)}`, {
                     method: 'DELETE'
                 });
-                
+
                 const result = await response.json();
                 showToast(result.message, 'success');
                 loadRedisKeys();
@@ -1075,29 +1075,29 @@
         // Goals Functions
         async function loadAllGoals() {
             const container = document.getElementById('all-goals-list');
-            
+
             try {
                 const response = await fetch('/api/goals/list');
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Successfully fetched, but no goals exist - this is OK!
                 if (!data.goals || data.goals.length === 0) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-4">📋 No goals yet<br><span class="text-sm">Click "Create Goal" to add one</span></div>';
                     return;
                 }
-                
+
                 const statusColors = {
                     'pending': 'bg-gray-700 text-gray-300',
                     'in_progress': 'bg-blue-700 text-blue-300',
                     'completed': 'bg-green-700 text-green-300',
                     'cancelled': 'bg-red-700 text-red-300',
                 };
-                
+
                 container.innerHTML = data.goals.map(goal => `
                     <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-650 transition-colors cursor-pointer" onclick="viewGoalDetails('${goal.id}')">
                         <div class="flex justify-between items-start mb-2">
@@ -1132,29 +1132,29 @@
 
         async function loadAllTasks() {
             const container = document.getElementById('all-tasks-list');
-            
+
             try {
                 const response = await fetch('/api/tasks/list');
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Successfully fetched, but no tasks exist - this is OK!
                 if (!data.tasks || data.tasks.length === 0) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-4">📝 No tasks yet<br><span class="text-sm">Tasks are created as part of goals</span></div>';
                     return;
                 }
-                
+
                 const statusColors = {
                     'pending': 'bg-gray-700 text-gray-300',
                     'in_progress': 'bg-blue-700 text-blue-300',
                     'completed': 'bg-green-700 text-green-300',
                     'cancelled': 'bg-red-700 text-red-300',
                 };
-                
+
                 container.innerHTML = data.tasks.map(task => `
                     <div class="bg-gray-700 rounded-lg p-3">
                         <div class="flex justify-between items-start mb-2">
@@ -1189,19 +1189,19 @@
         async function createGoal() {
             const description = document.getElementById('new-goal-description').value;
             const priority = document.getElementById('new-goal-priority').value;
-            
+
             if (!description) {
                 showToast('Description is required', 'error');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/goals', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({description, priority})
                 });
-                
+
                 const result = await response.json();
                 showToast('Goal created successfully', 'success');
                 closeModal('createGoalModal');
@@ -1215,16 +1215,16 @@
         async function viewGoalDetails(goalId) {
             try {
                 const response = await fetch(`/api/goals/${goalId}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
                 const goal = data.goal;
                 const tasks = data.tasks || [];
                 const tasksByStatus = data.tasks_by_status || {};
-                
+
                 // Status colors
                 const statusColors = {
                     'pending': 'bg-gray-700 text-gray-300',
@@ -1232,14 +1232,14 @@
                     'completed': 'bg-green-700 text-green-300',
                     'cancelled': 'bg-red-700 text-red-300',
                 };
-                
+
                 const taskStatusColors = {
                     'pending': 'bg-gray-600 text-gray-300',
                     'in_progress': 'bg-blue-600 text-blue-300',
                     'completed': 'bg-green-600 text-green-300',
                     'cancelled': 'bg-red-600 text-red-300',
                 };
-                
+
                 // Fill goal details
                 document.getElementById('goal-detail-title').textContent = goal.description.substring(0, 60) + (goal.description.length > 60 ? '...' : '');
                 document.getElementById('goal-detail-id').textContent = goal.id;
@@ -1247,18 +1247,18 @@
                 document.getElementById('goal-detail-created').textContent = new Date(goal.created_at).toLocaleString();
                 document.getElementById('goal-detail-updated').textContent = new Date(goal.updated_at).toLocaleString();
                 document.getElementById('goal-detail-description').textContent = goal.description;
-                
+
                 // Status badge
                 const statusBadge = document.getElementById('goal-detail-status-badge');
                 statusBadge.textContent = goal.status.replace('_', ' ').toUpperCase();
                 statusBadge.className = `px-3 py-1 rounded text-sm ${statusColors[goal.status] || statusColors.pending}`;
-                
+
                 // Task counts
                 document.getElementById('task-count-pending').textContent = tasksByStatus.pending || 0;
                 document.getElementById('task-count-progress').textContent = tasksByStatus.in_progress || 0;
                 document.getElementById('task-count-completed').textContent = tasksByStatus.completed || 0;
                 document.getElementById('task-count-cancelled').textContent = tasksByStatus.cancelled || 0;
-                
+
                 // Tasks list
                 const tasksContainer = document.getElementById('goal-detail-tasks');
                 if (tasks.length === 0) {
@@ -1285,7 +1285,7 @@
                         </div>
                     `).join('');
                 }
-                
+
                 showModal('viewGoalModal');
             } catch (error) {
                 showToast(`Failed to load goal details: ${error.message}`, 'error');
@@ -1295,14 +1295,14 @@
 
         async function updateGoalStatus(goalId, status) {
             if (!status) return;
-            
+
             try {
                 const response = await fetch(`/api/goals/${goalId}`, {
                     method: 'PATCH',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({status})
                 });
-                
+
                 showToast('Goal updated', 'success');
                 loadAllGoals();
                 refreshData();
@@ -1332,14 +1332,14 @@
 
         async function updateTaskStatus(taskId, status) {
             if (!status) return;
-            
+
             try {
                 const response = await fetch(`/api/tasks/${taskId}`, {
                     method: 'PATCH',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({status})
                 });
-                
+
                 showToast('Task updated', 'success');
                 loadAllTasks();
                 refreshData();
@@ -1368,32 +1368,32 @@
 
         // Environment Functions
         let currentEditEnvVar = null;
-        
+
         async function loadEnvVariables() {
             const container = document.getElementById('env-list');
-            
+
             try {
                 const response = await fetch('/api/env');
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Successfully fetched - should always have server data
                 if (!data.servers || Object.keys(data.servers).length === 0) {
                     container.innerHTML = '<div class="text-center text-gray-400 py-8">⚙️ No servers configured</div>';
                     return;
                 }
-                
+
                 container.innerHTML = Object.entries(data.servers).map(([key, server]) => {
                     const envVars = server.env_vars && Object.keys(server.env_vars).length > 0
                         ? Object.entries(server.env_vars).map(([name, info]) => {
                             const statusClass = info.configured ? 'text-green-400' : 'text-red-400';
                             const statusIcon = info.configured ? '✓' : '✗';
                             const displayValue = info.masked_value || 'Not set';
-                            
+
                             return `
                                 <div class="flex justify-between items-center py-2 border-b border-gray-600">
                                     <span class="text-sm font-mono">${name}</span>
@@ -1406,7 +1406,7 @@
                             `;
                         }).join('')
                         : '<div class="text-xs text-gray-400">✓ No environment variables required</div>';
-                    
+
                     return `
                         <div class="bg-gray-700 rounded-lg p-4">
                             <h3 class="text-sm font-bold text-white mb-3">${server.name}</h3>
@@ -1419,33 +1419,33 @@
                 console.error('Failed to load environment variables:', error);
             }
         }
-        
+
         async function editEnvVariable(varName) {
             currentEditEnvVar = varName;
-            
+
             try {
                 // Fetch current value
                 const response = await fetch(`/api/env/get/${varName}`);
                 const data = await response.json();
-                
+
                 // Set modal fields
                 document.getElementById('edit-env-name').textContent = varName;
                 document.getElementById('edit-env-value').value = data.value || '';
                 document.getElementById('edit-env-value').type = 'password';
                 document.getElementById('eye-icon-open').classList.add('hidden');
                 document.getElementById('eye-icon-closed').classList.remove('hidden');
-                
+
                 showModal('editEnvModal');
             } catch (error) {
                 showToast(`Failed to load variable: ${error.message}`, 'error');
             }
         }
-        
+
         function toggleEnvValueVisibility() {
             const input = document.getElementById('edit-env-value');
             const eyeOpen = document.getElementById('eye-icon-open');
             const eyeClosed = document.getElementById('eye-icon-closed');
-            
+
             if (input.type === 'password') {
                 input.type = 'text';
                 eyeOpen.classList.remove('hidden');
@@ -1456,23 +1456,23 @@
                 eyeClosed.classList.remove('hidden');
             }
         }
-        
+
         async function saveEnvVariable() {
             if (!currentEditEnvVar) {
                 console.error('No current edit variable');
                 return;
             }
-            
+
             const value = document.getElementById('edit-env-value').value;
-            
+
             if (!value.trim()) {
                 showToast('⚠️ Value cannot be empty', 'error');
                 return;
             }
-            
+
             try {
                 console.log('Saving env variable:', currentEditEnvVar);
-                
+
                 const response = await fetch('/api/env/update', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -1482,31 +1482,31 @@
                         }
                     })
                 });
-                
+
                 console.log('Response status:', response.status);
-                
+
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.detail || `HTTP ${response.status}`);
                 }
-                
+
                 const result = await response.json();
                 console.log('Save result:', result);
-                
+
                 // Close modal first
                 closeModal('editEnvModal');
-                
+
                 // Show success message
                 showToast(`✅ ${result.message}`, 'success');
-                
+
                 // Reload environment variables
                 await loadEnvVariables();
-                
+
                 // Show warning about restarting servers after a delay
                 setTimeout(() => {
                     showToast('⚠️ Restart affected servers for changes to take effect', 'warning');
                 }, 3000);
-                
+
             } catch (error) {
                 console.error('Error saving env variable:', error);
                 showToast(`❌ Failed to save: ${error.message}`, 'error');
@@ -1516,27 +1516,27 @@
         // Log Functions
         async function downloadLogs() {
             const serverKey = document.getElementById('log-server-filter').value;
-            
+
             if (serverKey === 'all') {
                 showToast('Please select a specific server to download logs', 'error');
                 return;
             }
-            
+
             window.location.href = `/api/logs/download/${serverKey}`;
         }
 
         async function clearLogs() {
             const serverKey = document.getElementById('log-server-filter').value;
-            
+
             if (serverKey === 'all') {
                 showToast('Please select a specific server to clear logs', 'error');
                 return;
             }
-            
+
             if (!confirm(`Clear logs for ${serverKey}?`)) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/logs/${serverKey}`, {method: 'DELETE'});
                 const result = await response.json();
@@ -1551,17 +1551,17 @@
         // Render servers
         function renderServers(servers) {
             const container = document.getElementById('servers-list');
-            
+
             if (servers.length === 0) {
                 container.innerHTML = '<div class="text-center text-gray-500 py-8">No servers configured</div>';
                 return;
             }
-            
+
             container.innerHTML = servers.map(server => {
                 const statusClass = server.status === 'running' ? 'status-running' : 'status-stopped';
                 const statusText = server.status === 'running' ? 'Running' : 'Stopped';
                 const envClass = server.env_configured ? 'text-green-400' : 'text-yellow-400';
-                
+
                 let detailsHtml = '';
                 if (server.status === 'running' && server.details) {
                     detailsHtml = `
@@ -1572,7 +1572,7 @@
                         </div>
                     `;
                 }
-                
+
                 // Control buttons
                 let controlButtons = '';
                 if (server.status === 'running') {
@@ -1585,7 +1585,7 @@
                         <button onclick="controlServer('${server.key}', 'start')" class="btn btn-success btn-sm">Start</button>
                     `;
                 }
-                
+
                 return `
                     <div class="bg-gray-700 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-2">
@@ -1612,7 +1612,7 @@
         // Render Redis stats
         function renderRedisStats(stats) {
             const container = document.getElementById('redis-stats');
-            
+
             container.innerHTML = `
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
@@ -1653,17 +1653,17 @@
         function renderLogs(data) {
             const container = document.getElementById('logs-container');
             const filter = document.getElementById('log-server-filter');
-            
+
             // Update filter options
             if (data.all_servers) {
                 const servers = Object.keys(data.all_servers);
                 const currentValue = filter.value;
-                
+
                 filter.innerHTML = '<option value="all">All Servers</option>' +
                     servers.map(key => `<option value="${key}">${key}</option>`).join('');
                 filter.value = currentValue;
             }
-            
+
             // Get logs for selected server or all
             let logs = [];
             if (data.all_servers) {
@@ -1684,19 +1684,19 @@
                     }));
                 }
             }
-            
+
             if (logs.length === 0) {
                 container.innerHTML = '<div class="text-center text-gray-500 py-8">No logs available</div>';
                 return;
             }
-            
+
             // Display last 50 logs
             logs = logs.slice(-50);
-            
+
             container.innerHTML = logs.map(log => {
                 return `<div class="log-${log.level} mb-1"><span class="text-gray-500">[${log.server || 'system'}]</span> ${log.text}</div>`;
             }).join('');
-            
+
             // Scroll to bottom
             container.scrollTop = container.scrollHeight;
         }
@@ -1718,10 +1718,10 @@
         // Initialize page
         function initializeDashboard() {
             console.log('Initializing dashboard with WebSocket...');
-            
+
             // Connect to WebSocket for real-time updates
             connectWebSocket();
-            
+
             // Handle page visibility changes - reconnect if page becomes visible
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {

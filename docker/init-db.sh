@@ -12,10 +12,9 @@ echo "Initializing MCP Goals database..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     -- Ensure UTF-8 encoding
     ALTER DATABASE mcp_goals SET timezone TO 'UTC';
-    
+
     -- Log initialization
     SELECT 'MCP Goals database initialized successfully!' as message;
 EOSQL
 
 echo "Database initialization complete!"
-

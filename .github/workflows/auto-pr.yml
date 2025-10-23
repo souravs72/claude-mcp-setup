@@ -4,6 +4,10 @@ on:
   push:
     branches: [dev]
 
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   create-pr:
     runs-on: ubuntu-latest
@@ -14,7 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.MY_REPO_TOKEN }}
 
       - name: Create Pull Request
         run: |
@@ -28,7 +32,7 @@ jobs:
               --head dev \
               --title "Merge dev to main - ${{ github.event.head_commit.message }}" \
               --body "## Changes from dev branch
-              
+
           This PR was automatically created from the dev branch.
 
           **Commit:** ${{ github.event.head_commit.message }}
