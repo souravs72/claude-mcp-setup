@@ -54,7 +54,9 @@ class InternetClient(BaseClient):
         self.config = config
         self.search_endpoint = "/customsearch/v1"
         self.max_workers = max_workers
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Internet")
+        self.executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="Internet"
+        )
 
         import atexit
 
@@ -62,7 +64,9 @@ class InternetClient(BaseClient):
 
         logger.info(f"Internet client initialized with {max_workers} worker threads")
 
-    def _generate_cache_key(self, url_or_query: str, params: dict[str, Any] | None = None) -> str:
+    def _generate_cache_key(
+        self, url_or_query: str, params: dict[str, Any] | None = None
+    ) -> str:
         """Generate cache key for requests."""
         key_data = url_or_query
         if params:
@@ -171,7 +175,9 @@ class InternetClient(BaseClient):
             logger.error(f"Failed to fetch {url}: {e}")
             raise
 
-    def batch_fetch_urls(self, urls: list[str], timeout: int | None = None) -> dict[str, Any]:
+    def batch_fetch_urls(
+        self, urls: list[str], timeout: int | None = None
+    ) -> dict[str, Any]:
         """Fetch multiple URLs concurrently using ThreadPoolExecutor."""
         logger.info(f"Starting batch fetch for {len(urls)} URLs")
 
@@ -342,7 +348,9 @@ def web_search(
     """Search the web using Google Custom Search API."""
     if not internet_client:
         return json.dumps({"error": "Internet client not initialized"})
-    results = internet_client.search(query, max_results, search_type, file_type, date_restrict)
+    results = internet_client.search(
+        query, max_results, search_type, file_type, date_restrict
+    )
     return json.dumps(results, indent=2)
 
 
@@ -380,7 +388,9 @@ def batch_search(queries: str, max_results: int = 10) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def search_and_fetch(query: str, max_results: int = 5, fetch_content: bool = True) -> str:
+def search_and_fetch(
+    query: str, max_results: int = 5, fetch_content: bool = True
+) -> str:
     """Search and fetch full content from top results in one operation."""
     if not internet_client:
         return json.dumps({"error": "Internet client not initialized"})

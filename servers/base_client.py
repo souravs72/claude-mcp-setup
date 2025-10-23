@@ -111,7 +111,9 @@ class BaseClient:
 
             if "errors" in error_data and error_data["errors"]:
                 if isinstance(error_data["errors"], dict):
-                    errors = [f"{field}: {msg}" for field, msg in error_data["errors"].items()]
+                    errors = [
+                        f"{field}: {msg}" for field, msg in error_data["errors"].items()
+                    ]
                     return " | ".join(errors)
                 return str(error_data["errors"])
 
@@ -119,7 +121,9 @@ class BaseClient:
         except Exception:
             return response.text[:500]
 
-    def _make_request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
+    def _make_request(
+        self, method: str, endpoint: str, **kwargs: Any
+    ) -> requests.Response:
         """
         Make HTTP request with error handling.
 

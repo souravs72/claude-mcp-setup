@@ -42,7 +42,9 @@ class GitHubClient:
         self.config = config
 
         auth = Auth.Token(config.token)
-        self.client = Github(auth=auth, timeout=config.timeout, retry=config.max_retries)
+        self.client = Github(
+            auth=auth, timeout=config.timeout, retry=config.max_retries
+        )
         self.default_branch = config.default_branch
 
         # Verify authentication
@@ -57,7 +59,9 @@ class GitHubClient:
         self, username: str | None = None, sort: str = "updated", limit: int = 20
     ) -> list[dict]:
         """List repositories for a user or authenticated user."""
-        logger.debug(f"Listing repositories (user: {username or 'authenticated'}, limit: {limit})")
+        logger.debug(
+            f"Listing repositories (user: {username or 'authenticated'}, limit: {limit})"
+        )
 
         try:
             if username:
@@ -84,8 +88,12 @@ class GitHubClient:
                         "forks": repo.forks_count,
                         "open_issues": repo.open_issues_count,
                         "default_branch": repo.default_branch,
-                        "created_at": (repo.created_at.isoformat() if repo.created_at else None),
-                        "updated_at": (repo.updated_at.isoformat() if repo.updated_at else None),
+                        "created_at": (
+                            repo.created_at.isoformat() if repo.created_at else None
+                        ),
+                        "updated_at": (
+                            repo.updated_at.isoformat() if repo.updated_at else None
+                        ),
                     }
                 )
 
@@ -96,7 +104,9 @@ class GitHubClient:
             logger.error(f"Failed to list repositories: {e}")
             raise
 
-    def get_file_content(self, repo_name: str, file_path: str, branch: str = "main") -> dict:
+    def get_file_content(
+        self, repo_name: str, file_path: str, branch: str = "main"
+    ) -> dict:
         """Get content of a specific file from a repository."""
         logger.debug(f"Fetching file: {repo_name}/{file_path} (branch: {branch})")
 
@@ -309,7 +319,9 @@ class GitHubClient:
             logger.error(f"Failed to get branch info: {e}")
             raise
 
-    def create_branch(self, repo_name: str, branch_name: str, source_branch: str = "main") -> dict:
+    def create_branch(
+        self, repo_name: str, branch_name: str, source_branch: str = "main"
+    ) -> dict:
         """
         Create a new branch from a source branch.
 
@@ -321,7 +333,9 @@ class GitHubClient:
         Returns:
             Created branch information
         """
-        logger.debug(f"Creating branch {branch_name} from {source_branch} in {repo_name}")
+        logger.debug(
+            f"Creating branch {branch_name} from {source_branch} in {repo_name}"
+        )
 
         try:
             repo = self.client.get_repo(repo_name)
@@ -347,7 +361,9 @@ class GitHubClient:
             source_sha = source_ref.object.sha
 
             # Create new branch
-            new_ref = repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=source_sha)
+            new_ref = repo.create_git_ref(
+                ref=f"refs/heads/{branch_name}", sha=source_sha
+            )
 
             logger.info(f"Created branch: {branch_name} at {source_sha[:7]}")
 
@@ -508,7 +524,9 @@ class GitHubClient:
             branch_ref = repo.get_git_ref(f"heads/{branch}")
             branch_ref.edit(new_commit.sha)
 
-            logger.info(f"Committed {len(files)} files to {branch}: {new_commit.sha[:7]}")
+            logger.info(
+                f"Committed {len(files)} files to {branch}: {new_commit.sha[:7]}"
+            )
 
             return {
                 "success": True,
@@ -625,7 +643,9 @@ class GitHubClient:
 
                 # Recursively get subdirectories
                 if recursive and item.type == "dir":
-                    subtree = self.get_directory_tree(repo_name, item.path, branch, True)
+                    subtree = self.get_directory_tree(
+                        repo_name, item.path, branch, True
+                    )
                     tree.extend(subtree)
 
             logger.info(f"Retrieved directory tree with {len(tree)} items")
@@ -670,7 +690,9 @@ except Exception as e:
 # MCP Tools
 @mcp.tool()
 @handle_errors(logger)
-def list_repositories(username: str | None = None, sort: str = "updated", limit: int = 20) -> str:
+def list_repositories(
+    username: str | None = None, sort: str = "updated", limit: int = 20
+) -> str:
     """
     List repositories for a user or authenticated user.
 
@@ -763,13 +785,17 @@ def create_issue(
     labels_list = json.loads(labels) if labels else None
     assignees_list = json.loads(assignees) if assignees else None
 
-    issue = github_client.create_issue(repo_name, title, body, labels_list, assignees_list)
+    issue = github_client.create_issue(
+        repo_name, title, body, labels_list, assignees_list
+    )
     return json.dumps(issue, indent=2)
 
 
 @mcp.tool()
 @handle_errors(logger)
-def create_pull_request(repo_name: str, title: str, head: str, base: str, body: str = "") -> str:
+def create_pull_request(
+    repo_name: str, title: str, head: str, base: str, body: str = ""
+) -> str:
     """
     Create a pull request.
 
@@ -963,7 +989,9 @@ def delete_file(
     if not github_client:
         return json.dumps({"error": "GitHub client not initialized"})
 
-    result = github_client.delete_file(repo_name, file_path, commit_message, branch, sha)
+    result = github_client.delete_file(
+        repo_name, file_path, commit_message, branch, sha
+    )
     return json.dumps(result, indent=2)
 
 

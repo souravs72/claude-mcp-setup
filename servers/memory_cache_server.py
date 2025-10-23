@@ -75,7 +75,9 @@ class RedisCacheClient:
         try:
             if self._client:
                 self._client.ping()
-                logger.info(f"Connected to Redis at {self.config.host}:{self.config.port}")
+                logger.info(
+                    f"Connected to Redis at {self.config.host}:{self.config.port}"
+                )
         except RedisConnectionError as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
@@ -279,7 +281,9 @@ class RedisCacheClient:
             logger.error(f"Failed to search keys: {e}")
             raise
 
-    def scan(self, cursor: int = 0, match: str | None = None, count: int = 10) -> dict[str, Any]:
+    def scan(
+        self, cursor: int = 0, match: str | None = None, count: int = 10
+    ) -> dict[str, Any]:
         """
         Incrementally iterate over keys (production-safe).
 
