@@ -17,7 +17,7 @@ jobs:
         run: |
           # Check if PR already exists
           EXISTING_PR=$(gh pr list --base main --head dev --json number --jq '.[0].number' 2>/dev/null || echo "")
-          
+
           if [ -z "$EXISTING_PR" ] || [ "$EXISTING_PR" = "null" ]; then
             echo "Creating new PR from dev to main..."
             gh pr create \
@@ -27,15 +27,15 @@ jobs:
               --body "## Changes from dev branch
               
           This PR was automatically created from the dev branch.
-          
+
           **Commit:** ${{ github.event.head_commit.message }}
           **Author:** ${{ github.event.head_commit.author.name }}
           **Date:** ${{ github.event.head_commit.timestamp }}
-          
+
           ### What's Changed
           - Latest updates from dev branch
           - Ready for review and merge
-          
+
           ### Checklist
           - [ ] Code reviewed
           - [ ] Tests passing
