@@ -26,14 +26,14 @@ jobs:
           # Debug: Show available branches
           echo "Available branches:"
           git branch -a
-          
+
           # Fetch main branch to a temporary reference
           git fetch origin main:refs/remotes/origin/main
-          
+
           # Debug: Verify branches exist
           echo "Checking if main and dev branches exist:"
           git show-ref refs/remotes/origin/main refs/heads/dev
-          
+
           # Check if there are commits to merge (compare remote main with local dev)
           COMMITS_AHEAD=$(git rev-list --count refs/remotes/origin/main..dev)
 
