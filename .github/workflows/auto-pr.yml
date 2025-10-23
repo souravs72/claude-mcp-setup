@@ -28,7 +28,7 @@ jobs:
               --head dev \
               --title "Merge dev to main - ${{ github.event.head_commit.message }}" \
               --body "## Changes from dev branch
-              
+
           This PR was automatically created from the dev branch.
 
           **Commit:** ${{ github.event.head_commit.message }}

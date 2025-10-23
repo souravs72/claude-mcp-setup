@@ -9,8 +9,8 @@ Usage:
     python scripts/start_all_servers.py          # Check configuration
     python scripts/start_all_servers.py --help   # Show detailed help
 """
-import sys
 import os
+import sys
 from pathlib import Path
 from typing import NamedTuple
 
@@ -35,7 +35,9 @@ SERVERS = [
         env_vars=["REDIS_HOST", "REDIS_PORT"],
     ),
     ServerConfig(
-        name="Goal Agent Server", script=servers_dir / "goal_agent_server.py", env_vars=[]
+        name="Goal Agent Server",
+        script=servers_dir / "goal_agent_server.py",
+        env_vars=[],
     ),
     ServerConfig(
         name="Internet Server",
@@ -247,7 +249,9 @@ def print_summary(files_found: int, total_files: int, env_results: dict) -> bool
     # Check Redis
     redis_running = check_redis()
     redis_status = "✓" if redis_running else "⚠"
-    print(f"  {redis_status} Redis Server: {'Running' if redis_running else 'Not running'}")
+    print(
+        f"  {redis_status} Redis Server: {'Running' if redis_running else 'Not running'}"
+    )
 
     # Check environment
     env_configured = True

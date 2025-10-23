@@ -4,14 +4,14 @@ Database initialization script for MCP Goal Agent.
 Creates PostgreSQL database and tables if they don't exist.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from servers.config import load_env_file, PostgresConfig
+from servers.config import PostgresConfig, load_env_file
 from servers.database import DatabaseManager
 from servers.logging_config import setup_logging
 

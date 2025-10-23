@@ -28,7 +28,7 @@ def test_dashboard_imports():
 def test_dashboard_structure():
     """Test that dashboard has required components."""
     try:
-        from servers.dashboard_server import app, SERVERS, get_redis_client
+        from servers.dashboard_server import SERVERS, app, get_redis_client
 
         # Check FastAPI app
         assert app is not None

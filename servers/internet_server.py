@@ -19,8 +19,17 @@ from mcp.server.fastmcp import FastMCP
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from servers.base_client import BaseClient, handle_errors
-from servers.config import ConfigurationError, InternetConfig, load_env_file, validate_config
-from servers.logging_config import log_server_shutdown, log_server_startup, setup_logging
+from servers.config import (
+    ConfigurationError,
+    InternetConfig,
+    load_env_file,
+    validate_config,
+)
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -45,7 +54,9 @@ class InternetClient(BaseClient):
         self.config = config
         self.search_endpoint = "/customsearch/v1"
         self.max_workers = max_workers
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Internet")
+        self.executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="Internet"
+        )
 
         import atexit
 
@@ -53,7 +64,9 @@ class InternetClient(BaseClient):
 
         logger.info(f"Internet client initialized with {max_workers} worker threads")
 
-    def _generate_cache_key(self, url_or_query: str, params: dict[str, Any] | None = None) -> str:
+    def _generate_cache_key(
+        self, url_or_query: str, params: dict[str, Any] | None = None
+    ) -> str:
         """Generate cache key for requests."""
         key_data = url_or_query
         if params:
@@ -129,7 +142,10 @@ class InternetClient(BaseClient):
 
         try:
             response = requests.get(
-                url, headers=headers, timeout=timeout or self.timeout, allow_redirects=True
+                url,
+                headers=headers,
+                timeout=timeout or self.timeout,
+                allow_redirects=True,
             )
             response.raise_for_status()
 
@@ -159,7 +175,9 @@ class InternetClient(BaseClient):
             logger.error(f"Failed to fetch {url}: {e}")
             raise
 
-    def batch_fetch_urls(self, urls: list[str], timeout: int | None = None) -> dict[str, Any]:
+    def batch_fetch_urls(
+        self, urls: list[str], timeout: int | None = None
+    ) -> dict[str, Any]:
         """Fetch multiple URLs concurrently using ThreadPoolExecutor."""
         logger.info(f"Starting batch fetch for {len(urls)} URLs")
 
@@ -300,7 +318,11 @@ try:
     log_server_startup(
         logger,
         "Internet Server",
-        {"Timeout": config.timeout, "Max Retries": config.max_retries, "Thread Pool Workers": 5},
+        {
+            "Timeout": config.timeout,
+            "Max Retries": config.max_retries,
+            "Thread Pool Workers": 5,
+        },
     )
 
     internet_client = InternetClient(config, max_workers=5)
@@ -326,7 +348,9 @@ def web_search(
     """Search the web using Google Custom Search API."""
     if not internet_client:
         return json.dumps({"error": "Internet client not initialized"})
-    results = internet_client.search(query, max_results, search_type, file_type, date_restrict)
+    results = internet_client.search(
+        query, max_results, search_type, file_type, date_restrict
+    )
     return json.dumps(results, indent=2)
 
 
@@ -364,7 +388,9 @@ def batch_search(queries: str, max_results: int = 10) -> str:
 
 @mcp.tool()
 @handle_errors(logger)
-def search_and_fetch(query: str, max_results: int = 5, fetch_content: bool = True) -> str:
+def search_and_fetch(
+    query: str, max_results: int = 5, fetch_content: bool = True
+) -> str:
     """Search and fetch full content from top results in one operation."""
     if not internet_client:
         return json.dumps({"error": "Internet client not initialized"})

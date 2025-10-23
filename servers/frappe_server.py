@@ -14,8 +14,17 @@ from mcp.server.fastmcp import FastMCP
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from servers.base_client import BaseClient, handle_errors
-from servers.config import ConfigurationError, FrappeConfig, load_env_file, validate_config
-from servers.logging_config import log_server_shutdown, log_server_startup, setup_logging
+from servers.config import (
+    ConfigurationError,
+    FrappeConfig,
+    load_env_file,
+    validate_config,
+)
+from servers.logging_config import (
+    log_server_shutdown,
+    log_server_startup,
+    setup_logging,
+)
 
 # Initialize
 project_root = Path(__file__).parent.parent
@@ -142,7 +151,9 @@ class FrappeClient(BaseClient):
 
         return result
 
-    def update_document(self, doctype: str, name: str, data: dict[str, Any]) -> dict[str, Any]:
+    def update_document(
+        self, doctype: str, name: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update an existing document.
 
@@ -189,7 +200,11 @@ try:
     log_server_startup(
         logger,
         "Frappe Server",
-        {"Site URL": config.site_url, "Timeout": config.timeout, "Max Retries": config.max_retries},
+        {
+            "Site URL": config.site_url,
+            "Timeout": config.timeout,
+            "Max Retries": config.max_retries,
+        },
     )
 
     frappe_client: FrappeClient | None = FrappeClient(config)

@@ -11,22 +11,26 @@ Features:
 - Optional log export to ./logs/test_results/
 """
 
+import concurrent.futures
+import os
+import shutil
 import subprocess
 import sys
-import os
 import time
-import shutil
-import concurrent.futures
 from pathlib import Path
 from typing import Dict, Tuple
+
 from dotenv import load_dotenv
 
 try:
-    from colorlog import ColoredFormatter
     import logging
+
+    from colorlog import ColoredFormatter
+
     HAS_COLORLOG = True
 except ImportError:
     import logging
+
     HAS_COLORLOG = False
 
 # ────────────────────────────── Setup ──────────────────────────────
