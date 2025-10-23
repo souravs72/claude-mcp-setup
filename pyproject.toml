@@ -25,7 +25,7 @@ classifiers = [
 
 dependencies = [
     "mcp>=1.0.0",
-    "pydantic>=2.6.0,<2.10.0",
+    "pydantic>=2.6.0,<2.13.0",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "click>=8.1.0",
