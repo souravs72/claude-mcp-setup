@@ -1,0 +1,43 @@
+name: Auto PR from dev to main
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Create Pull Request
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: dev
+          destination_branch: main
+          pr_title: "🚀 Merge dev to main - ${{ github.event.head_commit.message }}"
+          pr_body: |
+            ## Changes from dev branch
+            
+            This PR was automatically created from the dev branch.
+            
+            **Commit:** ${{ github.event.head_commit.message }}
+            **Author:** ${{ github.event.head_commit.author.name }}
+            **Date:** ${{ github.event.head_commit.timestamp }}
+            
+            ### What's Changed
+            - Latest updates from dev branch
+            - Ready for review and merge
+            
+            ### Checklist
+            - [ ] Code reviewed
+            - [ ] Tests passing
+            - [ ] Documentation updated
+          pr_label: "auto-merge,dev-to-main"
+          pr_assignee: ${{ github.event.head_commit.author.name }}
+          pr_reviewer: ${{ github.event.head_commit.author.name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
