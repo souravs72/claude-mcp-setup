@@ -21,7 +21,7 @@ Security vulnerabilities should be reported privately to prevent exploitation.
 
 ### 2. Report via Email
 
-Send an email to: **souravs72@github.com** or create a private security advisory on GitHub
+Send an email to: **souravsingh2609@gmail.com** or create a private security advisory on GitHub
 
 Include the following information:
 
@@ -177,7 +177,7 @@ Include the following information:
 
 ## Contact Information
 
-- **Security Email**: souravs72@github.com
+- **Security Email**: souravsingh2609@gmail.com
 - **General Issues**: Use GitHub Issues
 - **Documentation**: Check project README and docs
 
