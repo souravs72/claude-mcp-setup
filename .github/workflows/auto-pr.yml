@@ -39,8 +39,7 @@ jobs:
           ### Checklist
           - [ ] Code reviewed
           - [ ] Tests passing
-          - [ ] Documentation updated" \
-              --label "auto-merge,dev-to-main"
+          - [ ] Documentation updated"
           else
             echo "PR #$EXISTING_PR already exists from dev to main"
           fi
