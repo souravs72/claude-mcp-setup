@@ -2,14 +2,14 @@ name: MCP Servers CI/CD
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       redis:
         image: redis:7-alpine
@@ -22,97 +22,96 @@ jobs:
           --health-retries 5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        cache: 'pip'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
 
-    - name: Verify mcpctl installation
-      run: |
-        mcpctl --version
-        which mcpctl
+      - name: Verify mcpctl installation
+        run: |
+          mcpctl --version
+          which mcpctl
 
-    - name: Set up environment
-      run: |
-        echo "REDIS_HOST=localhost" >> $GITHUB_ENV
-        echo "REDIS_PORT=6379" >> $GITHUB_ENV
-        # Add other environment variables as needed
-        # Use GitHub Secrets for sensitive data
+      - name: Set up environment
+        run: |
+          echo "REDIS_HOST=localhost" >> $GITHUB_ENV
+          echo "REDIS_PORT=6379" >> $GITHUB_ENV
+          # Add other environment variables as needed
+          # Use GitHub Secrets for sensitive data
 
-    - name: Validate configuration
-      run: |
-        mcpctl config
-        mcpctl start --check-only
+      - name: Validate configuration
+        run: |
+          mcpctl config
+          mcpctl start --check-only
 
-    - name: Run integration tests
-      run: |
-        mcpctl test --verbose
+      - name: Run integration tests
+        run: |
+          mcpctl test --verbose
 
-    - name: Check server status
-      run: |
-        mcpctl status -v
+      - name: Check server status
+        run: |
+          mcpctl status -v
 
-    - name: Upload test logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-logs
-        path: logs/test_results/
-        retention-days: 7
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: logs/test_results/
+          retention-days: 7
 
   lint:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-    - name: Install dependencies
-      run: |
-        pip install black flake8 mypy isort
+      - name: Install dependencies
+        run: |
+          pip install black flake8 mypy isort
 
-    - name: Run Black
-      run: black --check servers/ mcpctl.py
+      - name: Run Black
+        run: black --check servers/ mcpctl.py
 
-    - name: Run isort
-      run: isort --check-only servers/ mcpctl.py
+      - name: Run isort
+        run: isort --check-only servers/ mcpctl.py
 
-    - name: Run Flake8
-      run: flake8 servers/ mcpctl.py --max-line-length=100
+      - name: Run Flake8
+        run: flake8 servers/ mcpctl.py --max-line-length=100
 
-    - name: Run MyPy
-      run: mypy servers/ --config-file pyproject.toml
-      continue-on-error: true
+      - name: Run MyPy
+        run: mypy servers/ --config-file pyproject.toml
+        continue-on-error: true
 
   deploy:
     needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Build package
-      run: |
-        python -m pip install --upgrade pip build
-        python -m build
+      - name: Build package
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
 
-    - name: Deploy notification
-      run: |
-        echo "✓ All tests passed - ready for deployment"
-
+      - name: Deploy notification
+        run: |
+          echo "✓ All tests passed - ready for deployment"
