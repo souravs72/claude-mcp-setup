@@ -26,7 +26,7 @@ jobs:
             gh pr create \
               --base main \
               --head dev \
-              --title "🚀 Merge dev to main - ${{ github.event.head_commit.message }}" \
+              --title "Merge dev to main - ${{ github.event.head_commit.message }}" \
               --body "## Changes from dev branch
               
           This PR was automatically created from the dev branch.
