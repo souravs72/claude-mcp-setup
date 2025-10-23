@@ -47,6 +47,4 @@ jobs:
             echo "PR #$EXISTING_PR already exists from dev to main"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Alternative: Use personal access token if repository settings don't allow Actions to create PRs
-          # GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_REPO_TOKEN }}
