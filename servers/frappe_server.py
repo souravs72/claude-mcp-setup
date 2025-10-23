@@ -151,7 +151,9 @@ class FrappeClient(BaseClient):
 
         return result
 
-    def update_document(self, doctype: str, name: str, data: dict[str, Any]) -> dict[str, Any]:
+    def update_document(
+        self, doctype: str, name: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update an existing document.
 
