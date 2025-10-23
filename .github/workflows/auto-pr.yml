@@ -26,15 +26,15 @@ jobs:
           # Debug: Show available branches
           echo "Available branches:"
           git branch -a
-          
+
           # Ensure we have all refs and can access both branches
           git fetch origin main:main
           git fetch origin dev:dev
-          
+
           # Debug: Verify branches exist
           echo "Checking if main and dev branches exist:"
           git show-ref --heads main dev
-          
+
           # Check if there are commits to merge
           COMMITS_AHEAD=$(git rev-list --count main..dev)
 
