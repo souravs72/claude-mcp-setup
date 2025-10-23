@@ -12,32 +12,37 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
       - name: Create Pull Request
-        uses: repo-sync/pull-request@v2
-        with:
-          source_branch: dev
-          destination_branch: main
-          pr_title: "🚀 Merge dev to main - ${{ github.event.head_commit.message }}"
-          pr_body: |
-            ## Changes from dev branch
-            
-            This PR was automatically created from the dev branch.
-            
-            **Commit:** ${{ github.event.head_commit.message }}
-            **Author:** ${{ github.event.head_commit.author.name }}
-            **Date:** ${{ github.event.head_commit.timestamp }}
-            
-            ### What's Changed
-            - Latest updates from dev branch
-            - Ready for review and merge
-            
-            ### Checklist
-            - [ ] Code reviewed
-            - [ ] Tests passing
-            - [ ] Documentation updated
-          pr_label: "auto-merge,dev-to-main"
-          pr_assignee: ${{ github.event.head_commit.author.name }}
-          pr_reviewer: ${{ github.event.head_commit.author.name }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --base main --head dev --json number --jq '.[0].number' 2>/dev/null || echo "")
+          
+          if [ -z "$EXISTING_PR" ] || [ "$EXISTING_PR" = "null" ]; then
+            echo "Creating new PR from dev to main..."
+            gh pr create \
+              --base main \
+              --head dev \
+              --title "🚀 Merge dev to main - ${{ github.event.head_commit.message }}" \
+              --body "## Changes from dev branch
+              
+          This PR was automatically created from the dev branch.
+          
+          **Commit:** ${{ github.event.head_commit.message }}
+          **Author:** ${{ github.event.head_commit.author.name }}
+          **Date:** ${{ github.event.head_commit.timestamp }}
+          
+          ### What's Changed
+          - Latest updates from dev branch
+          - Ready for review and merge
+          
+          ### Checklist
+          - [ ] Code reviewed
+          - [ ] Tests passing
+          - [ ] Documentation updated" \
+              --label "auto-merge,dev-to-main"
+          else
+            echo "PR #$EXISTING_PR already exists from dev to main"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
