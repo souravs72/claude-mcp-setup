@@ -26,17 +26,16 @@ jobs:
           # Debug: Show available branches
           echo "Available branches:"
           git branch -a
-
-          # Ensure we have all refs and can access both branches
-          git fetch origin main:main
-          git fetch origin dev:dev
-
+          
+          # Fetch main branch to a temporary reference
+          git fetch origin main:refs/remotes/origin/main
+          
           # Debug: Verify branches exist
           echo "Checking if main and dev branches exist:"
-          git show-ref --heads main dev
-
-          # Check if there are commits to merge
-          COMMITS_AHEAD=$(git rev-list --count main..dev)
+          git show-ref refs/remotes/origin/main refs/heads/dev
+          
+          # Check if there are commits to merge (compare remote main with local dev)
+          COMMITS_AHEAD=$(git rev-list --count refs/remotes/origin/main..dev)
 
           if [ "$COMMITS_AHEAD" -eq 0 ]; then
             echo "No commits to merge - dev is up to date with main"
