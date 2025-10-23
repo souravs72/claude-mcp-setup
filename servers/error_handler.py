@@ -41,9 +41,7 @@ class MCPErrorHandler:
 
         # Check if file exists
         if not Path(file_path).exists():
-            suggestions.append(
-                f"File '{file_path}' does not exist. Check the file path."
-            )
+            suggestions.append(f"File '{file_path}' does not exist. Check the file path.")
             return {
                 "error": f"File not found: {file_path}",
                 "type": "file_not_found",
@@ -71,9 +69,7 @@ class MCPErrorHandler:
 
             # Check for common issues
             if len(old_string.strip()) == 0:
-                suggestions.append(
-                    "The old_string is empty. Provide the exact text to replace."
-                )
+                suggestions.append("The old_string is empty. Provide the exact text to replace.")
             elif len(old_string) > 200:
                 suggestions.append(
                     "The old_string is very long. Try using a shorter, unique portion."
@@ -97,17 +93,11 @@ class MCPErrorHandler:
             "type": "string_replacement_error",
             "suggestion": "; ".join(suggestions),
             "file_path": file_path,
-            "old_string_preview": old_string[:100] + "..."
-            if len(old_string) > 100
-            else old_string,
-            "new_string_preview": new_string[:100] + "..."
-            if len(new_string) > 100
-            else new_string,
+            "old_string_preview": old_string[:100] + "..." if len(old_string) > 100 else old_string,
+            "new_string_preview": new_string[:100] + "..." if len(new_string) > 100 else new_string,
         }
 
-    def _find_similar_strings(
-        self, content: str, target: str, threshold: float = 0.7
-    ) -> List[str]:
+    def _find_similar_strings(self, content: str, target: str, threshold: float = 0.7) -> List[str]:
         """Find strings similar to the target in the content."""
         if not target.strip():
             return []
@@ -168,9 +158,7 @@ class MCPErrorHandler:
                     f"Convert string to list: json.loads('{field_value}') or ['{field_value}']"
                 )
             elif expected_type == "dict" and isinstance(field_value, str):
-                suggestions.append(
-                    f"Convert string to dict: json.loads('{field_value}')"
-                )
+                suggestions.append(f"Convert string to dict: json.loads('{field_value}')")
 
         # Common validation issues
         if field_value is None:
@@ -187,9 +175,9 @@ class MCPErrorHandler:
             "field_value": str(field_value),
             "field_type": type(field_value).__name__,
             "expected_type": expected_type,
-            "suggestion": "; ".join(suggestions)
-            if suggestions
-            else "Check the field value and format",
+            "suggestion": (
+                "; ".join(suggestions) if suggestions else "Check the field value and format"
+            ),
         }
 
     def handle_file_operation_error(
@@ -236,9 +224,7 @@ class MCPErrorHandler:
             if not path.exists():
                 suggestions.append(f"File '{file_path}' does not exist")
             elif path.is_dir():
-                suggestions.append(
-                    f"'{file_path}' is a directory. Use rmdir or remove files first"
-                )
+                suggestions.append(f"'{file_path}' is a directory. Use rmdir or remove files first")
 
         return {
             "error": f"File {operation} error: {error_msg}",
@@ -248,9 +234,11 @@ class MCPErrorHandler:
             "file_exists": path.exists(),
             "is_file": path.is_file() if path.exists() else False,
             "is_directory": path.is_dir() if path.exists() else False,
-            "suggestion": "; ".join(suggestions)
-            if suggestions
-            else f"Check the file path and permissions for {operation} operation",
+            "suggestion": (
+                "; ".join(suggestions)
+                if suggestions
+                else f"Check the file path and permissions for {operation} operation"
+            ),
         }
 
     def create_success_response(

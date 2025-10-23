@@ -956,6 +956,7 @@ def get_directory_tree(
     tree = github_client.get_directory_tree(repo_name, path, branch, recursive)
     return json.dumps(tree, indent=2)
 
+
 def main() -> None:
     """Main entry point for Frappe MCP Server."""
     try:

@@ -53,7 +53,7 @@ class FrappeClient(BaseClient):
     def close(self) -> None:
         """Close the client session."""
         try:
-            if hasattr(self, 'session') and self.session:
+            if hasattr(self, "session") and self.session:
                 self.session.close()
                 logger.info("Frappe client session closed")
         except Exception as e:

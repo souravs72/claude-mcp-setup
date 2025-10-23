@@ -48,6 +48,7 @@ class InternetClient(BaseClient):
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Internet")
 
         import atexit
+
         atexit.register(self.shutdown)
 
         logger.info(f"Internet client initialized with {max_workers} worker threads")

@@ -148,16 +148,13 @@ def find_server_processes() -> List[Dict]:
                             server_name = Path(arg).stem
                             if server_name in server_names:
                                 # Find the key in SERVERS
-                                server_key = server_name.replace("_server", "").replace(
-                                    "_", "-"
-                                )
+                                server_key = server_name.replace("_server", "").replace("_", "-")
                                 server_processes.append(
                                     {
                                         "key": server_key,
                                         "name": SERVERS[server_key]["name"],
                                         "pid": proc.info["pid"],
-                                        "uptime": time.time()
-                                        - proc.info["create_time"],
+                                        "uptime": time.time() - proc.info["create_time"],
                                         "process": proc,
                                     }
                                 )
@@ -197,9 +194,7 @@ def cli(ctx, version):
 
 
 @cli.command()
-@click.option(
-    "--check-only", is_flag=True, help="Only check configuration without starting"
-)
+@click.option("--check-only", is_flag=True, help="Only check configuration without starting")
 def start(check_only):
     """Start all MCP servers (validates configuration)"""
     print_header("MCP Server Configuration Check")
@@ -319,9 +314,7 @@ def stop():
     # Graceful shutdown
     for server in server_processes:
         try:
-            click.echo(
-                f"  → Sending SIGTERM to {server['name']} (PID: {server['pid']})"
-            )
+            click.echo(f"  → Sending SIGTERM to {server['name']} (PID: {server['pid']})")
             server["process"].terminate()
         except psutil.NoSuchProcess:
             print_success(f"Process {server['name']} already terminated")
@@ -342,9 +335,7 @@ def stop():
             pass
 
     if still_running:
-        print_warning(
-            f"{len(still_running)} process(es) still running, forcing termination..."
-        )
+        print_warning(f"{len(still_running)} process(es) still running, forcing termination...")
         for server in still_running:
             try:
                 click.echo(f"  → Force killing {server['name']} (PID: {server['pid']})")
@@ -385,9 +376,7 @@ def status(verbose):
                     click.echo(f"    Env vars: {', '.join(server['env_vars'])}")
                 click.echo()
     else:
-        click.echo(
-            f"{Colors.GREEN}{len(server_processes)} server(s) running:{Colors.RESET}\n"
-        )
+        click.echo(f"{Colors.GREEN}{len(server_processes)} server(s) running:{Colors.RESET}\n")
 
         for server in server_processes:
             uptime_mins = int(server["uptime"] / 60)
@@ -513,9 +502,7 @@ def logs(server, lines, follow, all):
 
 @cli.command()
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed test output")
-@click.option(
-    "--timeout", "-t", default=3, help="Timeout for each server test (seconds)"
-)
+@click.option("--timeout", "-t", default=3, help="Timeout for each server test (seconds)")
 def test(verbose, timeout):
     """Run quick integration checks on all servers"""
     print_header("MCP Server Integration Tests")
@@ -587,9 +574,7 @@ def dashboard():
     is_flag=True,
     help="Start only the dashboard without starting servers",
 )
-@click.option(
-    "--servers-only", is_flag=True, help="Start only the servers without the dashboard"
-)
+@click.option("--servers-only", is_flag=True, help="Start only the servers without the dashboard")
 def run(dashboard_only, servers_only):
     """Start all MCP servers and dashboard with a single command"""
     print_header("Starting MCP Environment")
@@ -760,9 +745,7 @@ def config():
             for var in server["env_vars"]:
                 is_set = bool(os.getenv(var))
                 status = (
-                    f"{Colors.GREEN}✓{Colors.RESET}"
-                    if is_set
-                    else f"{Colors.RED}✗{Colors.RESET}"
+                    f"{Colors.GREEN}✓{Colors.RESET}" if is_set else f"{Colors.RED}✗{Colors.RESET}"
                 )
                 value = "***" if is_set else "not set"
                 click.echo(f"    {status} {var}: {value}")
