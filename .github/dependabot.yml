@@ -42,7 +42,7 @@ updates:
       - "github-actions"
       - "ci"
 
-  # Docker dependencies (if using Docker)
+  # Docker dependencies (monitors docker-compose.yml)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -58,3 +58,12 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+    # Monitor Docker images from docker-compose.yml
+    ignore:
+      # Ignore major version updates for critical services
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dpage/pgadmin4"
+        update-types: ["version-update:semver-major"]
