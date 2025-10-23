@@ -6,6 +6,7 @@ Provides a web interface for monitoring MCP servers, Redis cache, goals, and log
 
 import asyncio
 import json
+import logging
 import os
 import sys
 import time
@@ -951,7 +952,8 @@ async def list_goals():
             "source": "PostgreSQL",
         }
     except Exception as e:
-        return {"error": str(e), "goals": [], "count": 0}
+        logging.error("Exception in list_goals: %s", e, exc_info=True)
+        return {"error": "An internal server error occurred", "goals": [], "count": 0}
 
 
 @app.get("/api/goals/{goal_id}")
